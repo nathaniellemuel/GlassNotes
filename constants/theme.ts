@@ -8,6 +8,7 @@ export const GlassTheme = {
   glassBackground: 'rgba(255, 255, 255, 0.05)',
   glassBorder: 'rgba(255, 255, 255, 0.08)',
   glassBorderFocused: 'rgba(255, 255, 255, 0.15)',
+  glassHighlight: 'rgba(255, 255, 255, 0.12)',
 
   // Text
   textPrimary: '#FFFFFF',
@@ -22,7 +23,10 @@ export const GlassTheme = {
 
   // Semantic
   destructive: '#EF4444',
-  destructiveBackground: 'rgba(239, 68, 68, 0.12)',
+  destructiveBackground: 'rgba(239, 68, 68, 0.15)',
+  success: '#22C55E',
+  successBackground: 'rgba(34, 197, 94, 0.15)',
+  warning: '#F59E0B',
 
   // Spacing
   spacing: {
@@ -40,10 +44,20 @@ export const GlassTheme = {
     md: 12,
     lg: 16,
     xl: 20,
+    xxl: 24,
     full: 9999,
   },
 
   // Blur
   blurIntensity: 40,
   blurTint: 'dark' as const,
+
+  // Shadows
+  shadowPrimary: {
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
 };

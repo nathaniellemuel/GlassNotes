@@ -32,6 +32,14 @@ function toggleWrap(text: string, selection: Selection, marker: string): FormatR
 }
 
 export function toggleHeading(text: string, selection: Selection): FormatResult {
+  return toggleLinePrefix(text, selection, '# ');
+}
+
+export function toggleBullet(text: string, selection: Selection): FormatResult {
+  return toggleLinePrefix(text, selection, '- ');
+}
+
+function toggleLinePrefix(text: string, selection: Selection, prefix: string): FormatResult {
   const { start } = selection;
 
   let lineStart = start;
@@ -41,19 +49,22 @@ export function toggleHeading(text: string, selection: Selection): FormatResult 
   const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
   const line = text.slice(lineStart, actualLineEnd);
 
-  if (line.startsWith('# ')) {
-    const newText = text.slice(0, lineStart) + line.slice(2) + text.slice(actualLineEnd);
-    const offset = -2;
+  if (line.startsWith(prefix)) {
+    const newText = text.slice(0, lineStart) + line.slice(prefix.length) + text.slice(actualLineEnd);
+    const offset = -prefix.length;
     return {
       newText,
-      newSelection: { start: Math.max(lineStart, start + offset), end: Math.max(lineStart, start + offset) },
+      newSelection: {
+        start: Math.max(lineStart, start + offset),
+        end: Math.max(lineStart, start + offset),
+      },
     };
   }
 
-  const newText = text.slice(0, lineStart) + '# ' + line + text.slice(actualLineEnd);
+  const newText = text.slice(0, lineStart) + prefix + line + text.slice(actualLineEnd);
   return {
     newText,
-    newSelection: { start: start + 2, end: start + 2 },
+    newSelection: { start: start + prefix.length, end: start + prefix.length },
   };
 }
 
@@ -62,6 +73,8 @@ export function stripFormatting(text: string): string {
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
     .replace(/^# /gm, '')
+    .replace(/^- /gm, '')
+    .replace(/^---$/gm, '')
     .replace(/\n/g, ' ')
     .trim();
 }

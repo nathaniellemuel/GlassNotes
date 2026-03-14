@@ -12,7 +12,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withRepeat,
+  withTiming,
+  FadeIn,
+  Easing,
+} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { GlassTheme } from '@/constants/theme';
 import { useNotes } from '@/hooks/use-notes';
@@ -29,19 +37,48 @@ export default function NotesListScreen() {
     useNotes();
 
   const fabScale = useSharedValue(1);
+  const fabRotation = useSharedValue(0);
+
   const fabStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fabScale.value }],
+    transform: [{ scale: fabScale.value }, { rotate: `${fabRotation.value}deg` }],
   }));
+
+  const orbFloat = useSharedValue(0);
+  const orbFloat2 = useSharedValue(0);
 
   useFocusEffect(
     useCallback(() => {
       loadNotes();
+      orbFloat.value = withRepeat(
+        withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true,
+      );
+      orbFloat2.value = withRepeat(
+        withTiming(1, { duration: 8000, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true,
+      );
     }, [loadNotes]),
   );
 
+  const orbStyle1 = useAnimatedStyle(() => ({
+    transform: [{ translateY: orbFloat.value * -20 }, { translateX: orbFloat.value * 10 }],
+    opacity: 0.4 + orbFloat.value * 0.2,
+  }));
+
+  const orbStyle2 = useAnimatedStyle(() => ({
+    transform: [{ translateY: orbFloat2.value * 15 }, { translateX: orbFloat2.value * -15 }],
+    opacity: 0.3 + orbFloat2.value * 0.15,
+  }));
+
   const handleCreateNote = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/editor');
+    fabRotation.value = withSpring(90, { damping: 12, stiffness: 200 });
+    setTimeout(() => {
+      fabRotation.value = withSpring(0, { damping: 12, stiffness: 200 });
+      router.push('/editor');
+    }, 150);
   };
 
   const handleNotePress = (id: string) => {
@@ -49,10 +86,14 @@ export default function NotesListScreen() {
   };
 
   const handleNoteLongPress = (note: NotePreview) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(note.title, undefined, [
       {
         text: note.isPinned ? 'Unpin' : 'Pin',
-        onPress: () => togglePin(note.id),
+        onPress: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          togglePin(note.id);
+        },
       },
       {
         text: 'Delete',
@@ -63,7 +104,10 @@ export default function NotesListScreen() {
             {
               text: 'Delete',
               style: 'destructive',
-              onPress: () => deleteNote(note.id),
+              onPress: () => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                deleteNote(note.id);
+              },
             },
           ]);
         },
@@ -72,27 +116,38 @@ export default function NotesListScreen() {
     ]);
   };
 
-  const renderItem = ({ item }: { item: NotePreview }) => (
+  const renderItem = ({ item, index }: { item: NotePreview; index: number }) => (
     <NoteListItem
       note={item}
+      index={index}
       onPress={() => handleNotePress(item.id)}
       onLongPress={() => handleNoteLongPress(item)}
     />
   );
 
+  const pinnedCount = filteredNotes.filter((n) => n.isPinned).length;
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <LinearGradient
-        colors={['rgba(139, 92, 246, 0.06)', 'transparent']}
+        colors={['rgba(139, 92, 246, 0.08)', 'rgba(99, 102, 241, 0.03)', 'transparent']}
         style={styles.gradient}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
       />
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>GlassNotes</Text>
-        <Text style={styles.headerSubtitle}>
-          {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
-        </Text>
-      </View>
+      <Animated.View style={[styles.orb1, orbStyle1]} />
+      <Animated.View style={[styles.orb2, orbStyle2]} />
+
+      <Animated.View entering={FadeIn.duration(600)} style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>GlassNotes</Text>
+          <Text style={styles.headerSubtitle}>
+            {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
+            {pinnedCount > 0 ? `  \u2022  ${pinnedCount} pinned` : ''}
+          </Text>
+        </View>
+      </Animated.View>
 
       <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
 
@@ -118,10 +173,10 @@ export default function NotesListScreen() {
       <AnimatedPressable
         onPress={handleCreateNote}
         onPressIn={() => {
-          fabScale.value = withSpring(0.9, { damping: 15, stiffness: 300 });
+          fabScale.value = withSpring(0.85, { damping: 15, stiffness: 400 });
         }}
         onPressOut={() => {
-          fabScale.value = withSpring(1, { damping: 15, stiffness: 300 });
+          fabScale.value = withSpring(1, { damping: 10, stiffness: 200 });
         }}
         style={[styles.fab, { bottom: insets.bottom + 24 }, fabStyle]}
       >
@@ -148,18 +203,39 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 200,
+    height: 300,
+  },
+  orb1: {
+    position: 'absolute',
+    top: 60,
+    right: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+  },
+  orb2: {
+    position: 'absolute',
+    top: 160,
+    left: -40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(99, 102, 241, 0.06)',
   },
   header: {
-    paddingHorizontal: GlassTheme.spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: GlassTheme.spacing.lg,
     paddingTop: GlassTheme.spacing.lg,
     paddingBottom: GlassTheme.spacing.md,
   },
   headerTitle: {
-    fontSize: 34,
+    fontSize: 36,
     fontWeight: '800',
     color: GlassTheme.textPrimary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
   },
   headerSubtitle: {
     fontSize: 14,
@@ -168,6 +244,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 120,
+    paddingTop: GlassTheme.spacing.xs,
   },
   listEmpty: {
     flex: 1,
@@ -175,19 +252,15 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: GlassTheme.spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    shadowColor: GlassTheme.accentPrimary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    ...GlassTheme.shadowPrimary,
   },
   fabGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
   },

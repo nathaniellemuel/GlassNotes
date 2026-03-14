@@ -1,10 +1,11 @@
 import { BlurView } from 'expo-blur';
-import { StyleSheet, View, type ViewProps } from 'react-native';
+import { StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
 import { GlassTheme } from '@/constants/theme';
 
 type GlassCardProps = ViewProps & {
   intensity?: number;
   noPadding?: boolean;
+  accentColor?: string;
 };
 
 export function GlassCard({
@@ -12,8 +13,13 @@ export function GlassCard({
   style,
   intensity = GlassTheme.blurIntensity,
   noPadding = false,
+  accentColor,
   ...props
 }: GlassCardProps) {
+  const borderStyle: ViewStyle = accentColor
+    ? { borderColor: accentColor, borderLeftWidth: 3 }
+    : {};
+
   return (
     <View style={[styles.container, style]} {...props}>
       <BlurView
@@ -21,7 +27,7 @@ export function GlassCard({
         tint={GlassTheme.blurTint}
         style={StyleSheet.absoluteFill}
       />
-      <View style={[styles.innerBorder, !noPadding && styles.padding]}>
+      <View style={[styles.innerBorder, !noPadding && styles.padding, borderStyle]}>
         {children}
       </View>
     </View>

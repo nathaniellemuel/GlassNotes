@@ -5,6 +5,12 @@ import { stripFormatting } from '@/utils/formatting';
 
 const STORAGE_KEY = 'glassnotes_all_notes';
 
+function countWords(text: string): number {
+  const stripped = stripFormatting(text).trim();
+  if (!stripped) return 0;
+  return stripped.split(/\s+/).length;
+}
+
 export function useNotes() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -13,7 +19,13 @@ export function useNotes() {
   const loadNotes = useCallback(async () => {
     setIsLoading(true);
     const stored = await storage.get<Note[]>(STORAGE_KEY);
-    setNotes(stored ?? []);
+    // Migrate old notes that don't have new fields
+    const migrated = (stored ?? []).map((n) => ({
+      ...n,
+      checklist: n.checklist ?? [],
+      colorId: n.colorId ?? 'default',
+    })) as Note[];
+    setNotes(migrated);
     setIsLoading(false);
   }, []);
 
@@ -59,7 +71,11 @@ export function useNotes() {
     .filter((n) => {
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
-      return n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q);
+      return (
+        n.title.toLowerCase().includes(q) ||
+        n.content.toLowerCase().includes(q) ||
+        n.checklist.some((c) => c.text.toLowerCase().includes(q))
+      );
     })
     .sort((a, b) => {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
@@ -70,7 +86,11 @@ export function useNotes() {
       title: n.title || 'Untitled',
       updatedAt: n.updatedAt,
       isPinned: n.isPinned,
+      colorId: n.colorId ?? 'default',
       preview: stripFormatting(n.content).slice(0, 100),
+      checklistTotal: n.checklist.length,
+      checklistDone: n.checklist.filter((c) => c.checked).length,
+      wordCount: countWords(n.content),
     }));
 
   return {
