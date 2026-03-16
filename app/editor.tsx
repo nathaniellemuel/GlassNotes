@@ -8,7 +8,6 @@ import {
   ScrollView,
   Alert,
   KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -23,6 +22,7 @@ import { ChecklistEditor } from '@/components/checklist-editor';
 import { ColorPicker } from '@/components/color-picker';
 import { toggleBold, toggleItalic, toggleHeading, toggleBullet, stripFormatting } from '@/utils/formatting';
 import { generateId } from '@/utils/id';
+import { scheduleNotification, cancelNotification, requestPermissions } from '@/hooks/use-notifications';
 import { NOTE_COLORS } from '@/types/note';
 import type { Note, ChecklistItem, NoteColorId } from '@/types/note';
 
@@ -37,10 +37,11 @@ export default function EditorScreen() {
   const [colorId, setColorId] = useState<NoteColorId>('default');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [noteId] = useState(() => id ?? generateId());
-  const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
+  const [reminderAt, setReminderAt] = useState<number | undefined>();
 
   const contentRef = useRef<TextInput>(null);
+  const selectionRef = useRef({ start: 0, end: 0 });
   const debouncedTitle = useDebounce(title, 500);
   const debouncedContent = useDebounce(content, 500);
   const debouncedChecklist = useDebounce(checklist, 500);
@@ -53,6 +54,7 @@ export default function EditorScreen() {
         setContent(existing.content);
         setChecklist(existing.checklist ?? []);
         setColorId(existing.colorId ?? 'default');
+        setReminderAt(existing.reminderAt);
       }
     }
     setIsLoaded(true);
@@ -68,12 +70,13 @@ export default function EditorScreen() {
       content: debouncedContent,
       checklist: debouncedChecklist,
       colorId,
+      reminderAt,
       createdAt: id ? (getNote(id)?.createdAt ?? Date.now()) : Date.now(),
       updatedAt: Date.now(),
       isPinned: id ? (getNote(id)?.isPinned ?? false) : false,
     };
     saveNote(note);
-  }, [debouncedTitle, debouncedContent, debouncedChecklist, colorId, isLoaded]);
+  }, [debouncedTitle, debouncedContent, debouncedChecklist, colorId, reminderAt, isLoaded]);
 
   const handleDelete = () => {
     Alert.alert('Delete Note', 'Are you sure you want to delete this note?', [
@@ -83,6 +86,7 @@ export default function EditorScreen() {
         style: 'destructive',
         onPress: () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          cancelNotification(`note_${noteId}`);
           deleteNote(noteId);
           router.back();
         },
@@ -90,29 +94,81 @@ export default function EditorScreen() {
     ]);
   };
 
+  const handleReminder = useCallback(async () => {
+    const granted = await requestPermissions();
+    if (!granted) {
+      Alert.alert('Notifications Disabled', 'Please enable notifications in device settings to set reminders.');
+      return;
+    }
+
+    const buildTriggerTime = (offsetMs: number | null): number => {
+      if (offsetMs !== null) return Date.now() + offsetMs;
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(9, 0, 0, 0);
+      return tomorrow.getTime();
+    };
+
+    const setReminder = async (triggerTime: number) => {
+      setReminderAt(triggerTime);
+      await scheduleNotification(
+        `note_${noteId}`,
+        `Note: ${title || 'Untitled'}`,
+        'You have a note reminder',
+        new Date(triggerTime),
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    };
+
+    const buttons: { text: string; style?: 'cancel' | 'destructive' | 'default'; onPress?: () => void }[] = [
+      { text: 'In 1 hour', onPress: () => setReminder(buildTriggerTime(60 * 60 * 1000)) },
+      { text: 'In 3 hours', onPress: () => setReminder(buildTriggerTime(3 * 60 * 60 * 1000)) },
+      { text: 'Tomorrow 9AM', onPress: () => setReminder(buildTriggerTime(null)) },
+    ];
+    if (reminderAt) {
+      buttons.push({
+        text: 'Clear Reminder',
+        style: 'destructive',
+        onPress: async () => {
+          setReminderAt(undefined);
+          await cancelNotification(`note_${noteId}`);
+        },
+      });
+    }
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert(
+      reminderAt ? 'Change Reminder' : 'Set Reminder',
+      reminderAt
+        ? `Current: ${new Date(reminderAt).toLocaleString()}`
+        : 'When would you like to be reminded?',
+      buttons,
+    );
+  }, [noteId, title, reminderAt]);
+
   const handleBold = useCallback(() => {
-    const result = toggleBold(content, selection);
+    const result = toggleBold(content, selectionRef.current);
     setContent(result.newText);
-    setSelection(result.newSelection);
-  }, [content, selection]);
+    selectionRef.current = result.newSelection;
+  }, [content]);
 
   const handleItalic = useCallback(() => {
-    const result = toggleItalic(content, selection);
+    const result = toggleItalic(content, selectionRef.current);
     setContent(result.newText);
-    setSelection(result.newSelection);
-  }, [content, selection]);
+    selectionRef.current = result.newSelection;
+  }, [content]);
 
   const handleHeading = useCallback(() => {
-    const result = toggleHeading(content, selection);
+    const result = toggleHeading(content, selectionRef.current);
     setContent(result.newText);
-    setSelection(result.newSelection);
-  }, [content, selection]);
+    selectionRef.current = result.newSelection;
+  }, [content]);
 
   const handleBullet = useCallback(() => {
-    const result = toggleBullet(content, selection);
+    const result = toggleBullet(content, selectionRef.current);
     setContent(result.newText);
-    setSelection(result.newSelection);
-  }, [content, selection]);
+    selectionRef.current = result.newSelection;
+  }, [content]);
 
   const handleChecklist = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -120,14 +176,15 @@ export default function EditorScreen() {
   }, []);
 
   const handleDivider = useCallback(() => {
-    const before = content.slice(0, selection.start);
-    const after = content.slice(selection.end);
+    const sel = selectionRef.current;
+    const before = content.slice(0, sel.start);
+    const after = content.slice(sel.end);
     const divider = '\n---\n';
     const newText = before + divider + after;
-    const newPos = selection.start + divider.length;
+    const newPos = sel.start + divider.length;
     setContent(newText);
-    setSelection({ start: newPos, end: newPos });
-  }, [content, selection]);
+    selectionRef.current = { start: newPos, end: newPos };
+  }, [content]);
 
   const noteColor = NOTE_COLORS.find((c) => c.id === colorId) ?? NOTE_COLORS[0];
   const wordCount = stripFormatting(content).trim().split(/\s+/).filter(Boolean).length;
@@ -136,7 +193,7 @@ export default function EditorScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       keyboardVerticalOffset={0}
     >
       {/* Header */}
@@ -157,6 +214,18 @@ export default function EditorScreen() {
         </View>
 
         <View style={styles.headerActions}>
+          <Pressable
+            onPress={handleReminder}
+            style={styles.headerButton}
+            hitSlop={8}
+          >
+            <MaterialIcons
+              name={reminderAt ? 'notifications-active' : 'notifications-none'}
+              size={22}
+              color={reminderAt ? GlassTheme.accentPrimary : GlassTheme.textSecondary}
+            />
+          </Pressable>
+
           <Pressable
             onPress={() => setShowColorPicker(!showColorPicker)}
             style={styles.headerButton}
@@ -207,7 +276,9 @@ export default function EditorScreen() {
             placeholderTextColor={GlassTheme.textPlaceholder}
             value={content}
             onChangeText={setContent}
-            onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
+            onSelectionChange={(e) => {
+              selectionRef.current = e.nativeEvent.selection;
+            }}
             selectionColor={GlassTheme.accentPrimary}
             multiline
             textAlignVertical="top"

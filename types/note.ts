@@ -25,6 +25,8 @@ export interface Note {
   createdAt: number;
   updatedAt: number;
   isPinned: boolean;
+  reminderAt?: number;
+  notificationId?: string;
 }
 
 export type NotePreview = Pick<Note, 'id' | 'title' | 'updatedAt' | 'isPinned' | 'colorId'> & {

@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,10 +40,6 @@ export default function NotesListScreen() {
   const fabScale = useSharedValue(1);
   const fabRotation = useSharedValue(0);
 
-  const fabStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fabScale.value }, { rotate: `${fabRotation.value}deg` }],
-  }));
-
   const orbFloat = useSharedValue(0);
   const orbFloat2 = useSharedValue(0);
 
@@ -61,6 +58,10 @@ export default function NotesListScreen() {
       );
     }, [loadNotes]),
   );
+
+  const fabStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: fabScale.value }, { rotate: `${fabRotation.value}deg` }],
+  }));
 
   const orbStyle1 = useAnimatedStyle(() => ({
     transform: [{ translateY: orbFloat.value * -20 }, { translateX: orbFloat.value * 10 }],
@@ -140,12 +141,15 @@ export default function NotesListScreen() {
       <Animated.View style={[styles.orb2, orbStyle2]} />
 
       <Animated.View entering={FadeIn.duration(600)} style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>GlassNotes</Text>
-          <Text style={styles.headerSubtitle}>
-            {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
-            {pinnedCount > 0 ? `  \u2022  ${pinnedCount} pinned` : ''}
-          </Text>
+        <View style={styles.headerLeft}>
+          <Image source={require('../../assets/logo.jpeg')} style={styles.logo} />
+          <View>
+            <Text style={styles.headerTitle}>GlassNotes</Text>
+            <Text style={styles.headerSubtitle}>
+              {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
+              {pinnedCount > 0 ? `  \u2022  ${pinnedCount} pinned` : ''}
+            </Text>
+          </View>
         </View>
       </Animated.View>
 
@@ -178,7 +182,7 @@ export default function NotesListScreen() {
         onPressOut={() => {
           fabScale.value = withSpring(1, { damping: 10, stiffness: 200 });
         }}
-        style={[styles.fab, { bottom: insets.bottom + 24 }, fabStyle]}
+        style={[styles.fab, fabStyle]}
       >
         <LinearGradient
           colors={[GlassTheme.accentPrimary, GlassTheme.accentSecondary]}
@@ -231,19 +235,29 @@ const styles = StyleSheet.create({
     paddingTop: GlassTheme.spacing.lg,
     paddingBottom: GlassTheme.spacing.md,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: GlassTheme.spacing.sm,
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    borderRadius: GlassTheme.radius.md,
+  },
   headerTitle: {
-    fontSize: 36,
+    fontSize: 28,
     fontWeight: '800',
     color: GlassTheme.textPrimary,
     letterSpacing: -0.8,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: GlassTheme.textTertiary,
-    marginTop: GlassTheme.spacing.xs,
+    marginTop: 1,
   },
   listContent: {
-    paddingBottom: 120,
+    paddingBottom: 90,
     paddingTop: GlassTheme.spacing.xs,
   },
   listEmpty: {
@@ -252,6 +266,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: GlassTheme.spacing.lg,
+    bottom: 80,
     width: 60,
     height: 60,
     borderRadius: 30,

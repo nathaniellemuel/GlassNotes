@@ -18,11 +18,11 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function ToolbarButton({
   icon,
-  onPress,
+  onAction,
   color,
 }: {
   icon: keyof typeof MaterialIcons.glyphMap;
-  onPress: () => void;
+  onAction: () => void;
   color?: string;
 }) {
   const scale = useSharedValue(1);
@@ -31,20 +31,25 @@ function ToolbarButton({
     transform: [{ scale: scale.value }],
   }));
 
-  const handlePress = () => {
+  // IMPORTANT: Use onPressIn, not onPress.
+  // On Android, tapping a button blurs the TextInput first ("blur" fires before "press").
+  // onPressIn fires while the input is still focused, so selectionRef is still accurate.
+  const handlePressIn = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    scale.value = withSpring(0.8, { damping: 10, stiffness: 400 });
-    setTimeout(() => {
-      scale.value = withSpring(1, { damping: 10, stiffness: 200 });
-    }, 80);
-    onPress();
+    scale.value = withSpring(0.78, { damping: 10, stiffness: 400 });
+    onAction();
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 10, stiffness: 200 });
   };
 
   return (
     <AnimatedPressable
-      onPress={handlePress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       style={[styles.button, animStyle]}
-      hitSlop={4}
+      hitSlop={6}
     >
       <MaterialIcons name={icon} size={21} color={color ?? GlassTheme.textSecondary} />
     </AnimatedPressable>
@@ -62,14 +67,14 @@ export function FormattingToolbar({
   return (
     <GlassCard noPadding style={styles.container}>
       <View style={styles.inner}>
-        <ToolbarButton icon="format-bold" onPress={onBold} />
-        <ToolbarButton icon="format-italic" onPress={onItalic} />
-        <ToolbarButton icon="title" onPress={onHeading} />
+        <ToolbarButton icon="format-bold" onAction={onBold} />
+        <ToolbarButton icon="format-italic" onAction={onItalic} />
+        <ToolbarButton icon="title" onAction={onHeading} />
         <View style={styles.separator} />
-        <ToolbarButton icon="format-list-bulleted" onPress={onBullet} />
-        <ToolbarButton icon="check-box" onPress={onChecklist} color={GlassTheme.accentPrimary} />
+        <ToolbarButton icon="format-list-bulleted" onAction={onBullet} />
+        <ToolbarButton icon="check-box" onAction={onChecklist} color={GlassTheme.accentPrimary} />
         <View style={styles.separator} />
-        <ToolbarButton icon="horizontal-rule" onPress={onDivider} />
+        <ToolbarButton icon="horizontal-rule" onAction={onDivider} />
       </View>
     </GlassCard>
   );
