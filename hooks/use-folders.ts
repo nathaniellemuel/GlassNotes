@@ -21,10 +21,11 @@ export function useFolders() {
   }, [loadFolders]);
 
   const createFolder = useCallback(
-    (name: string): Folder => {
+    (name: string, parentId?: string): Folder => {
       const folder: Folder = {
         id: generateId(),
         name,
+        parentId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -50,7 +51,29 @@ export function useFolders() {
 
   const deleteFolder = useCallback((id: string) => {
     setFolders((prev) => {
-      const updated = prev.filter((f) => f.id !== id);
+      const childrenMap = new Map<string, string[]>();
+      for (const folder of prev) {
+        if (!folder.parentId) continue;
+        const children = childrenMap.get(folder.parentId) ?? [];
+        children.push(folder.id);
+        childrenMap.set(folder.parentId, children);
+      }
+
+      const toDelete = new Set<string>([id]);
+      const stack = [id];
+      while (stack.length > 0) {
+        const current = stack.pop();
+        if (!current) continue;
+        const children = childrenMap.get(current) ?? [];
+        for (const childId of children) {
+          if (!toDelete.has(childId)) {
+            toDelete.add(childId);
+            stack.push(childId);
+          }
+        }
+      }
+
+      const updated = prev.filter((f) => !toDelete.has(f.id));
       storage.set(STORAGE_KEY, updated);
       return updated;
     });
