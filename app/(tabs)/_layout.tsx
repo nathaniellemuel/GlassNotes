@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Pressable, Text, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GlassTheme } from '@/constants/theme';
@@ -19,6 +20,14 @@ function GlassPillTabBar({ state, descriptors, navigation }: BottomTabBarProps) 
     <View style={[styles.pillWrapper, { bottom: Math.max(insets.bottom, 12) }]}>
       <BlurView intensity={50} tint="dark" style={styles.pillBlur}>
         <View style={styles.pillInner}>
+          <View pointerEvents="none" style={styles.ambientGlow}>
+            <LinearGradient
+              colors={['rgba(139,92,246,0)', 'rgba(139,92,246,0.35)', 'rgba(34,197,94,0.28)', 'rgba(34,197,94,0)']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.ambientGlowGradient}
+            />
+          </View>
           {state.routes.map((route, index) => {
             const { options } = descriptors[route.key];
             const label = options.title ?? route.name;
@@ -35,23 +44,40 @@ function GlassPillTabBar({ state, descriptors, navigation }: BottomTabBarProps) 
                 navigation.navigate(route.name);
               }
             };
+            const onLongPress = () => {
+              navigation.emit({
+                type: 'tabLongPress',
+                target: route.key,
+              });
+            };
 
             return (
               <Pressable
                 key={route.key}
                 onPress={onPress}
-                style={[styles.tabButton, isFocused && styles.tabButtonActive]}
+                onLongPress={onLongPress}
+                style={styles.tabButton}
                 hitSlop={4}
               >
+                {isFocused ? (
+                  <View pointerEvents="none" style={styles.tabButtonActive}>
+                    <LinearGradient
+                      colors={['rgba(139,92,246,0.20)', 'rgba(255,255,255,0.08)', 'rgba(34,197,94,0.16)']}
+                      start={{ x: 0.15, y: 0 }}
+                      end={{ x: 0.85, y: 1 }}
+                      style={styles.tabButtonActiveGradient}
+                    />
+                  </View>
+                ) : null}
                 <MaterialIcons
                   name={iconName}
                   size={20}
-                  color={isFocused ? GlassTheme.accentPrimary : GlassTheme.textTertiary}
+                  color={isFocused ? GlassTheme.textPrimary : GlassTheme.textSecondary}
                 />
                 <Text
                   style={[
                     styles.tabLabel,
-                    { color: isFocused ? GlassTheme.accentPrimary : GlassTheme.textTertiary },
+                    { color: isFocused ? GlassTheme.textPrimary : GlassTheme.textSecondary },
                   ]}
                   numberOfLines={1}
                 >
@@ -82,40 +108,63 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   pillWrapper: {
     position: 'absolute',
-    left: 24,
-    right: 24,
+    left: 20,
+    right: 20,
     alignItems: 'center',
   },
   pillBlur: {
-    borderRadius: 28,
+    borderRadius: 34,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: 'rgba(255,255,255,0.35)',
+    width: '100%',
+    maxWidth: 460,
   },
   pillInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(15,15,15,0.65)',
-    gap: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(7,7,10,0.68)',
+    gap: 8,
+    position: 'relative',
+  },
+  ambientGlow: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ambientGlowGradient: {
+    width: '70%',
+    height: 86,
+    borderRadius: 30,
   },
   tabButton: {
     flex: 1,
-    flexDirection: 'row',
+    minHeight: 54,
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 22,
+    gap: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 24,
+    overflow: 'hidden',
+    position: 'relative',
+    zIndex: 1,
   },
   tabButtonActive: {
-    backgroundColor: 'rgba(139,92,246,0.15)',
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+  },
+  tabButtonActiveGradient: {
+    flex: 1,
+    borderRadius: 24,
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.1,
+    letterSpacing: 0.2,
   },
 });
