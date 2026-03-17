@@ -28,7 +28,7 @@ import type { Note, ChecklistItem, NoteColorId } from '@/types/note';
 
 export default function EditorScreen() {
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, folderId: paramFolderId } = useLocalSearchParams<{ id?: string; folderId?: string }>();
   const { getNote, saveNote, deleteNote } = useNotes();
 
   const [title, setTitle] = useState('');
@@ -70,6 +70,7 @@ export default function EditorScreen() {
       content: debouncedContent,
       checklist: debouncedChecklist,
       colorId,
+      folderId: id ? (getNote(id)?.folderId) : (paramFolderId || undefined),
       reminderAt,
       createdAt: id ? (getNote(id)?.createdAt ?? Date.now()) : Date.now(),
       updatedAt: Date.now(),
@@ -289,8 +290,8 @@ export default function EditorScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Toolbar */}
-      <View style={{ paddingBottom: insets.bottom }}>
+      {/* Toolbar - always visible at bottom */}
+      <View style={[styles.toolbarContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <FormattingToolbar
           onBold={handleBold}
           onItalic={handleItalic}
@@ -367,5 +368,10 @@ const styles = StyleSheet.create({
     color: GlassTheme.textPrimary,
     minHeight: 200,
     paddingTop: GlassTheme.spacing.sm,
+  },
+  toolbarContainer: {
+    backgroundColor: GlassTheme.backgroundPrimary,
+    borderTopWidth: 1,
+    borderTopColor: GlassTheme.glassBorder,
   },
 });

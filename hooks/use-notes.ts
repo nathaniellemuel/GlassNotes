@@ -67,6 +67,16 @@ export function useNotes() {
     [notes],
   );
 
+  const moveToFolder = useCallback((noteId: string, folderId: string | undefined) => {
+    setNotes((prev) => {
+      const updated = prev.map((n) =>
+        n.id === noteId ? { ...n, folderId, updatedAt: Date.now() } : n,
+      );
+      storage.set(STORAGE_KEY, updated);
+      return updated;
+    });
+  }, []);
+
   const filteredNotes: NotePreview[] = notes
     .filter((n) => {
       if (!searchQuery) return true;
@@ -87,6 +97,7 @@ export function useNotes() {
       updatedAt: n.updatedAt,
       isPinned: n.isPinned,
       colorId: n.colorId ?? 'default',
+      folderId: n.folderId,
       preview: stripFormatting(n.content).slice(0, 100),
       checklistTotal: n.checklist.length,
       checklistDone: n.checklist.filter((c) => c.checked).length,
@@ -102,6 +113,7 @@ export function useNotes() {
     saveNote,
     deleteNote,
     togglePin,
+    moveToFolder,
     getNote,
     loadNotes,
   };

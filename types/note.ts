@@ -22,6 +22,7 @@ export interface Note {
   content: string;
   checklist: ChecklistItem[];
   colorId: NoteColorId;
+  folderId?: string;
   createdAt: number;
   updatedAt: number;
   isPinned: boolean;
@@ -29,7 +30,7 @@ export interface Note {
   notificationId?: string;
 }
 
-export type NotePreview = Pick<Note, 'id' | 'title' | 'updatedAt' | 'isPinned' | 'colorId'> & {
+export type NotePreview = Pick<Note, 'id' | 'title' | 'updatedAt' | 'isPinned' | 'colorId' | 'folderId'> & {
   preview: string;
   checklistTotal: number;
   checklistDone: number;

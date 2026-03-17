@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 160,
   },
   eventsSection: {
     paddingHorizontal: GlassTheme.spacing.md,

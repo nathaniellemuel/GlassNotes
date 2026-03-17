@@ -210,7 +210,7 @@ export default function TodosScreen() {
       {/* FAB */}
       <Pressable
         onPress={openCreateModal}
-        style={styles.fab}
+        style={[styles.fab, { bottom: insets.bottom + 80 }]}
       >
         <LinearGradient
           colors={['#F59E0B', '#D97706']}
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
   },
   listContent: {
-    paddingBottom: 100,
+    paddingBottom: 160,
     paddingTop: 4,
   },
   listEmpty: {
@@ -401,7 +401,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: GlassTheme.spacing.lg,
-    bottom: 80,
     width: 60,
     height: 60,
     borderRadius: 30,
