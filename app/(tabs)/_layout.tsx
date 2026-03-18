@@ -5,15 +5,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GlassTheme } from '@/constants/theme';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useAppSettings } from '@/hooks/use-app-settings';
 
 const TAB_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   index: 'note',
   todos: 'checklist',
   calendar: 'calendar-today',
+  settings: 'settings',
 };
 
 function GlassPillTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  useAppSettings();
+  const activeColor = GlassTheme.accentPrimary;
+  const tabActiveStyle = {
+    backgroundColor: `${activeColor}26`,
+    borderColor: `${activeColor}66`,
+  };
 
   return (
     <View style={[styles.pillWrapper, { bottom: Math.max(insets.bottom, 12) }]}>
@@ -47,18 +55,18 @@ function GlassPillTabBar({ state, descriptors, navigation }: BottomTabBarProps) 
                 key={route.key}
                 onPress={onPress}
                 onLongPress={onLongPress}
-                style={[styles.tabButton, isFocused && styles.tabButtonActive]}
+                style={[styles.tabButton, isFocused && tabActiveStyle]}
                 hitSlop={4}
               >
                 <MaterialIcons
                   name={iconName}
                   size={18}
-                  color={isFocused ? '#60A5FA' : GlassTheme.textSecondary}
+                  color={isFocused ? activeColor : GlassTheme.textSecondary}
                 />
                 <Text
                   style={[
                     styles.tabLabel,
-                    { color: isFocused ? '#60A5FA' : GlassTheme.textSecondary },
+                    { color: isFocused ? activeColor : GlassTheme.textSecondary },
                   ]}
                   numberOfLines={1}
                 >
@@ -82,6 +90,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Notes' }} />
       <Tabs.Screen name="todos" options={{ title: 'To-Do' }} />
       <Tabs.Screen name="calendar" options={{ title: 'Calendar' }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
     </Tabs>
   );
 }
@@ -125,10 +134,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'transparent',
-  },
-  tabButtonActive: {
-    backgroundColor: 'rgba(96,165,250,0.16)',
-    borderColor: 'rgba(96,165,250,0.4)',
   },
   tabLabel: {
     fontSize: 12,

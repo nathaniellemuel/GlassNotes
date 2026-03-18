@@ -207,13 +207,14 @@ export default function EditorScreen() {
 
   const handleInsertPhoto = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
+    const hasAccess = permission.granted || permission.accessPrivileges === 'limited';
+    if (!hasAccess) {
       Alert.alert('Permission Required', 'Allow photo access to insert images into your note.');
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.9,
     });
 
@@ -234,6 +235,7 @@ export default function EditorScreen() {
     setContent(newText);
     selectionRef.current = newSelection;
     setSelection(newSelection);
+    Alert.alert('Image Inserted', image.fileName ?? 'Photo added to note.');
     contentRef.current?.focus();
   }, [content]);
 

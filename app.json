@@ -43,6 +43,12 @@
           "icon": "./assets/icon.png",
           "color": "#8B5CF6"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow GlassNotes to access your photos so you can insert images into notes."
+        }
       ]
     ],
     "experiments": {

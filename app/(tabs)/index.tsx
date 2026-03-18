@@ -32,6 +32,7 @@ import { useFolders } from '@/hooks/use-folders';
 import { SearchBar } from '@/components/search-bar';
 import { NoteListItem } from '@/components/note-list-item';
 import { EmptyState } from '@/components/empty-state';
+import { GlassCard } from '@/components/glass-card';
 import type { NotePreview } from '@/types/note';
 import type { Folder } from '@/types/folder';
 import type { LayoutRectangle } from 'react-native';
@@ -318,6 +319,7 @@ export default function NotesListScreen() {
   };
 
   const handleOpenFolder = (folder: Folder) => {
+    if (draggingItem) return;
     setCurrentFolderId(folder.id);
   };
 
@@ -457,6 +459,14 @@ export default function NotesListScreen() {
       <View
         ref={listFrameRef}
         style={styles.listFrame}
+        onTouchMove={(event) => {
+          if (!draggingItem) return;
+          handleDragMove(event.nativeEvent.pageX, event.nativeEvent.pageY);
+        }}
+        onTouchEnd={() => {
+          if (!draggingItem) return;
+          finishDrag();
+        }}
         onLayout={() => {
           listFrameRef.current?.measureInWindow((x, y) => {
             setListLeftX(x);
@@ -493,32 +503,38 @@ export default function NotesListScreen() {
                   folderLayouts.set(item.folder.id, event.nativeEvent.layout);
                 }}
               >
-                <View style={styles.explorerFolderLeft}>
-                  <MaterialIcons name="folder" size={20} color={GlassTheme.accentPrimary} />
-                  <View style={styles.explorerFolderTextWrap}>
-                    <Text style={styles.explorerFolderName} numberOfLines={1}>
-                      {item.folder.name}
-                    </Text>
-                    <Text style={styles.explorerFolderMeta}>
-                      {folderChildCount.get(item.folder.id) ?? 0} subfolders • {folderNoteCount.get(item.folder.id) ?? 0} notes
-                    </Text>
+                <GlassCard accentColor={GlassTheme.accentPrimary}>
+                  <View style={styles.explorerFolderInner}>
+                    <View style={styles.explorerFolderLeft}>
+                      <MaterialIcons name="folder" size={20} color={GlassTheme.accentPrimary} />
+                      <View style={styles.explorerFolderTextWrap}>
+                        <Text style={styles.explorerFolderName} numberOfLines={1}>
+                          {item.folder.name}
+                        </Text>
+                        <Text style={styles.explorerFolderMeta}>
+                          {folderChildCount.get(item.folder.id) ?? 0} subfolders • {folderNoteCount.get(item.folder.id) ?? 0} notes
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.folderRowActions}>
+                      <Pressable
+                        onPress={() => setItemMenu({ type: 'folder', folder: item.folder })}
+                        hitSlop={8}
+                      >
+                        <MaterialIcons name="more-vert" size={18} color={GlassTheme.textTertiary} />
+                      </Pressable>
+                    </View>
                   </View>
-                </View>
-                <View style={styles.folderRowActions}>
-                  <Pressable
-                    onPress={() => setItemMenu({ type: 'folder', folder: item.folder })}
-                    hitSlop={8}
-                  >
-                    <MaterialIcons name="more-vert" size={18} color={GlassTheme.textTertiary} />
-                  </Pressable>
-                  <MaterialIcons name="chevron-right" size={20} color={GlassTheme.textTertiary} />
-                </View>
+                </GlassCard>
               </Pressable>
             ) : (
               <NoteListItem
                 note={item.note}
                 index={index}
-                onPress={() => handleNotePress(item.note.id)}
+                onPress={() => {
+                  if (draggingItem) return;
+                  handleNotePress(item.note.id);
+                }}
                 onLongPress={(event) => handleNoteLongPress(item.note, event)}
                 onItemTouchMove={(event) => {
                   if (draggingItem?.type === 'note' && draggingItem.note.id === item.note.id) {
@@ -828,14 +844,12 @@ const styles = StyleSheet.create({
     marginHorizontal: GlassTheme.spacing.md,
     marginVertical: 4,
     borderRadius: GlassTheme.radius.lg,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
-    backgroundColor: GlassTheme.glassBackground,
-    paddingHorizontal: GlassTheme.spacing.md,
-    paddingVertical: GlassTheme.spacing.sm,
+  },
+  explorerFolderInner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
   },
   folderRowActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   explorerFolderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
