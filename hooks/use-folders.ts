@@ -79,6 +79,41 @@ export function useFolders() {
     });
   }, []);
 
+  const moveFolder = useCallback((id: string, parentId: string | undefined) => {
+    setFolders((prev) => {
+      if (id === parentId) return prev;
+
+      const childrenMap = new Map<string, string[]>();
+      for (const folder of prev) {
+        if (!folder.parentId) continue;
+        const children = childrenMap.get(folder.parentId) ?? [];
+        children.push(folder.id);
+        childrenMap.set(folder.parentId, children);
+      }
+
+      const descendants = new Set<string>();
+      const stack = [id];
+      while (stack.length > 0) {
+        const current = stack.pop();
+        if (!current) continue;
+        const children = childrenMap.get(current) ?? [];
+        for (const childId of children) {
+          if (descendants.has(childId)) continue;
+          descendants.add(childId);
+          stack.push(childId);
+        }
+      }
+
+      if (parentId && descendants.has(parentId)) return prev;
+
+      const updated = prev.map((folder) =>
+        folder.id === id ? { ...folder, parentId, updatedAt: Date.now() } : folder,
+      );
+      storage.set(STORAGE_KEY, updated);
+      return updated;
+    });
+  }, []);
+
   return {
     folders,
     isLoading,
@@ -86,5 +121,6 @@ export function useFolders() {
     createFolder,
     renameFolder,
     deleteFolder,
+    moveFolder,
   };
 }

@@ -1,18 +1,16 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   FlatList,
   Pressable,
-  Alert,
   RefreshControl,
   Image,
-  ScrollView,
   TextInput,
   Modal,
-  KeyboardAvoidingView,
-  Platform,
+  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -36,22 +34,11 @@ import { NoteListItem } from '@/components/note-list-item';
 import { EmptyState } from '@/components/empty-state';
 import type { NotePreview } from '@/types/note';
 import type { Folder } from '@/types/folder';
+import type { LayoutRectangle } from 'react-native';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const TAB_BAR_HEIGHT = 80;
-const ROOT_NAME = '';
-
-function folderLabel(folder: Folder, folderMap: Map<string, Folder>): string {
-  const path: string[] = [folder.name];
-  const visited = new Set<string>([folder.id]);
-  let cursor = folder.parentId ? folderMap.get(folder.parentId) : undefined;
-  while (cursor && !visited.has(cursor.id)) {
-    path.unshift(cursor.name);
-    visited.add(cursor.id);
-    cursor = cursor.parentId ? folderMap.get(cursor.parentId) : undefined;
-  }
-  return `${ROOT_NAME}/${path.join('/')}`;
-}
+const ROOT_NAME = 'My Drive';
 
 function collectFolderSubtreeIds(folderId: string, folders: Folder[]): Set<string> {
   const childrenMap = new Map<string, string[]>();
@@ -78,6 +65,7 @@ function collectFolderSubtreeIds(folderId: string, folders: Folder[]): Set<strin
 
 export default function NotesListScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const {
     notes,
     filteredNotes,
@@ -89,18 +77,36 @@ export default function NotesListScreen() {
     moveToFolder,
     loadNotes,
   } = useNotes();
-  const { folders, loadFolders, createFolder, renameFolder, deleteFolder } = useFolders();
+  const { folders, loadFolders, createFolder, renameFolder, deleteFolder, moveFolder } = useFolders();
 
   const [currentFolderId, setCurrentFolderId] = useState<string | undefined>(undefined);
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
-  const [draggingNote, setDraggingNote] = useState<NotePreview | null>(null);
+  const [itemMenu, setItemMenu] = useState<
+    | { type: 'note'; note: NotePreview }
+    | { type: 'folder'; folder: Folder }
+    | null
+  >(null);
+  const [confirmDelete, setConfirmDelete] = useState<
+    | { type: 'note'; note: NotePreview }
+    | { type: 'folder'; folder: Folder; noteMoveParentId?: string }
+    | null
+  >(null);
+  const [draggingItem, setDraggingItem] = useState<
+    | { type: 'note'; note: NotePreview; x: number; y: number; overFolderId?: string | null }
+    | { type: 'folder'; folder: Folder; x: number; y: number; overFolderId?: string | null }
+    | null
+  >(null);
+  const [scrollOffsetY, setScrollOffsetY] = useState(0);
+  const [listTopY, setListTopY] = useState(0);
+  const [listLeftX, setListLeftX] = useState(0);
 
   const fabScale = useSharedValue(1);
   const fabRotation = useSharedValue(0);
   const orbFloat = useSharedValue(0);
   const orbFloat2 = useSharedValue(0);
+  const listFrameRef = useRef<View>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -159,10 +165,116 @@ export default function NotesListScreen() {
     [folders, currentFolderId],
   );
 
+  const displayedFolders = useMemo(() => {
+    if (!searchQuery.trim()) return childFolders;
+    const q = searchQuery.toLowerCase();
+    return childFolders.filter((folder) => folder.name.toLowerCase().includes(q));
+  }, [childFolders, searchQuery]);
+
   const displayedNotes = useMemo(
     () => filteredNotes.filter((note) => note.folderId === currentFolderId),
     [filteredNotes, currentFolderId],
   );
+
+  const folderNoteCount = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const note of notes) {
+      if (!note.folderId) continue;
+      map.set(note.folderId, (map.get(note.folderId) ?? 0) + 1);
+    }
+    return map;
+  }, [notes]);
+
+  const folderChildCount = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const folder of folders) {
+      if (!folder.parentId) continue;
+      map.set(folder.parentId, (map.get(folder.parentId) ?? 0) + 1);
+    }
+    return map;
+  }, [folders]);
+
+  const folderLayouts = useMemo(() => new Map<string, LayoutRectangle>(), []);
+
+  type ExplorerItem =
+    | { type: 'folder'; folder: Folder }
+    | { type: 'note'; note: NotePreview };
+
+  const explorerItems = useMemo<ExplorerItem[]>(
+    () => [
+      ...displayedFolders.map((folder) => ({ type: 'folder' as const, folder })),
+      ...displayedNotes.map((note) => ({ type: 'note' as const, note })),
+    ],
+    [displayedFolders, displayedNotes],
+  );
+
+  const currentPathLabel = useMemo(() => {
+    if (pathFolders.length === 0) return ROOT_NAME;
+    return `${ROOT_NAME} / ${pathFolders.map((folder) => folder.name).join(' / ')}`;
+  }, [pathFolders]);
+
+  const isFolderDescendant = useCallback(
+    (folderId: string, potentialAncestorId: string): boolean => {
+      let cursor = folderMap.get(folderId);
+      const visited = new Set<string>();
+      while (cursor && cursor.parentId && !visited.has(cursor.id)) {
+        if (cursor.parentId === potentialAncestorId) return true;
+        visited.add(cursor.id);
+        cursor = folderMap.get(cursor.parentId);
+      }
+      return false;
+    },
+    [folderMap],
+  );
+
+  const resolveDropTarget = useCallback(
+    (pageX: number, pageY: number): string | null => {
+      for (const folder of displayedFolders) {
+        const layout = folderLayouts.get(folder.id);
+        if (!layout) continue;
+        const y = listTopY + layout.y - scrollOffsetY;
+        const x = listLeftX + layout.x;
+        if (pageX >= x && pageX <= x + layout.width && pageY >= y && pageY <= y + layout.height) {
+          return folder.id;
+        }
+      }
+      return null;
+    },
+    [displayedFolders, folderLayouts, listTopY, scrollOffsetY, listLeftX],
+  );
+
+  const handleDragMove = useCallback(
+    (pageX: number, pageY: number) => {
+      const overFolderId = resolveDropTarget(pageX, pageY);
+      setDraggingItem((prev) => (prev ? { ...prev, x: pageX, y: pageY, overFolderId } : prev));
+    },
+    [resolveDropTarget],
+  );
+
+  const finishDrag = useCallback(() => {
+    setDraggingItem((prev) => {
+      if (!prev) return prev;
+      if (prev.overFolderId == null) return null;
+      const targetFolderId = prev.overFolderId;
+      if (prev.type === 'note') {
+        moveToFolder(prev.note.id, targetFolderId);
+      } else {
+        const invalidSelfTarget = targetFolderId === prev.folder.id;
+        const invalidDescendantTarget = targetFolderId
+          ? isFolderDescendant(targetFolderId, prev.folder.id)
+          : false;
+        if (!invalidSelfTarget && !invalidDescendantTarget) {
+          moveFolder(prev.folder.id, targetFolderId);
+          if (currentFolderId === prev.folder.id) {
+            setCurrentFolderId(targetFolderId);
+          } else if (currentFolderId && isFolderDescendant(currentFolderId, prev.folder.id)) {
+            setCurrentFolderId(targetFolderId);
+          }
+        }
+      }
+      return null;
+    });
+  }, [moveToFolder, moveFolder, isFolderDescendant, currentFolderId]);
 
   const handleCreateNote = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -181,98 +293,16 @@ export default function NotesListScreen() {
     router.push({ pathname: '/editor', params: { id } });
   };
 
-  const moveOptions = useMemo(
-    () =>
-      folders.map((folder) => ({
-        text: folderLabel(folder, folderMap),
-        id: folder.id,
-      })),
-    [folders, folderMap],
-  );
-
-  const handleNoteLongPress = (note: NotePreview) => {
+  const handleNoteLongPress = (note: NotePreview, event: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(note.title, undefined, [
-      {
-        text: draggingNote?.id === note.id ? 'Cancel Drag' : 'Pick Up (Drag)',
-        onPress: () => {
-          setDraggingNote((prev) => (prev?.id === note.id ? null : note));
-        },
-      },
-      { text: note.isPinned ? 'Unpin' : 'Pin', onPress: () => togglePin(note.id) },
-      ...(folders.length > 0
-        ? [
-            {
-              text: 'Move to Folder',
-              onPress: () => {
-                Alert.alert('Move to Folder', undefined, [
-                  ...moveOptions.map((option) => ({
-                    text: option.text,
-                    onPress: () => moveToFolder(note.id, option.id),
-                  })),
-                  { text: `${ROOT_NAME} (Unfiled)`, onPress: () => moveToFolder(note.id, undefined) },
-                  { text: 'Cancel', style: 'cancel' as const },
-                ]);
-              },
-            },
-          ]
-        : []),
-      {
-        text: 'Delete',
-        style: 'destructive' as const,
-        onPress: () => {
-          Alert.alert('Delete Note', 'Are you sure?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: () => deleteNote(note.id) },
-          ]);
-        },
-      },
-      { text: 'Cancel', style: 'cancel' as const },
-    ]);
+    const { pageX, pageY } = event.nativeEvent;
+    setDraggingItem({ type: 'note', note, x: pageX, y: pageY });
   };
 
-  const handleFolderLongPress = (folder: Folder) => {
-    Alert.alert(folder.name, folder.parentId ? folderLabel(folder, folderMap) : undefined, [
-      {
-        text: 'Rename',
-        onPress: () => {
-          setEditingFolderId(folder.id);
-          setFolderName(folder.name);
-          setShowFolderModal(true);
-        },
-      },
-      {
-        text: 'Delete Folder',
-        style: 'destructive',
-        onPress: () => {
-          const parentId = folder.parentId;
-          const subtree = collectFolderSubtreeIds(folder.id, folders);
-          Alert.alert(
-            'Delete Folder',
-            'Subfolders will be deleted and notes inside will move to parent folder.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => {
-                  for (const note of notes) {
-                    if (note.folderId && subtree.has(note.folderId)) {
-                      moveToFolder(note.id, parentId);
-                    }
-                  }
-                  deleteFolder(folder.id);
-                  if (currentFolderId && subtree.has(currentFolderId)) {
-                    setCurrentFolderId(parentId);
-                  }
-                },
-              },
-            ],
-          );
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  const handleFolderLongPress = (folder: Folder, event: any) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const { pageX, pageY } = event.nativeEvent;
+    setDraggingItem({ type: 'folder', folder, x: pageX, y: pageY });
   };
 
   const handleSaveFolder = () => {
@@ -287,16 +317,64 @@ export default function NotesListScreen() {
     setEditingFolderId(null);
   };
 
-  const handleDropHere = () => {
-    if (!draggingNote) return;
-    moveToFolder(draggingNote.id, currentFolderId);
-    setDraggingNote(null);
+  const handleOpenFolder = (folder: Folder) => {
+    setCurrentFolderId(folder.id);
+  };
+
+  const handleGoUp = () => {
+    if (!currentFolderId) return;
+    setCurrentFolderId(currentFolder?.parentId);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!confirmDelete) return;
+    if (confirmDelete.type === 'note') {
+      deleteNote(confirmDelete.note.id);
+      setConfirmDelete(null);
+      return;
+    }
+
+    const folder = confirmDelete.folder;
+    const parentId = confirmDelete.noteMoveParentId;
+    const subtree = collectFolderSubtreeIds(folder.id, folders);
+    for (const note of notes) {
+      if (note.folderId && subtree.has(note.folderId)) {
+        moveToFolder(note.id, parentId);
+      }
+    }
+    deleteFolder(folder.id);
+    if (currentFolderId && subtree.has(currentFolderId)) {
+      setCurrentFolderId(parentId);
+    }
+    setConfirmDelete(null);
+  };
+
+  const handleDropCurrent = () => {
+    if (!draggingItem) return;
+    if (draggingItem.type === 'note') {
+      moveToFolder(draggingItem.note.id, currentFolderId);
+      setDraggingItem(null);
+      return;
+    }
+    if (draggingItem.folder.id === currentFolderId) {
+      setDraggingItem(null);
+      return;
+    }
+    if (currentFolderId && isFolderDescendant(currentFolderId, draggingItem.folder.id)) {
+      setDraggingItem(null);
+      return;
+    }
+    moveFolder(draggingItem.folder.id, currentFolderId);
+    setDraggingItem(null);
   };
 
   const pinnedCount = displayedNotes.filter((n) => n.isPinned).length;
-  const folderCountLabel = currentFolder
-    ? `${childFolders.length} folder${childFolders.length === 1 ? '' : 's'} in ${currentFolder.name}`
-    : `${childFolders.length} folder${childFolders.length === 1 ? '' : 's'} in ${ROOT_NAME}`;
+  const ghostLeft = draggingItem
+    ? Math.min(Math.max(draggingItem.x - 90, 12), windowWidth - 192)
+    : 0;
+  const ghostTop = draggingItem
+    ? Math.min(Math.max(draggingItem.y - 24, insets.top + 8), windowHeight - (insets.bottom + 64))
+    : 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -315,6 +393,8 @@ export default function NotesListScreen() {
           <View>
             <Text style={styles.headerTitle}>GlassNotes</Text>
             <Text style={styles.headerSubtitle}>
+              {displayedFolders.length} {displayedFolders.length === 1 ? 'folder' : 'folders'}
+              {'  •  '}
               {displayedNotes.length} {displayedNotes.length === 1 ? 'note' : 'notes'}
               {pinnedCount > 0 ? `  \u2022  ${pinnedCount} pinned` : ''}
             </Text>
@@ -323,79 +403,49 @@ export default function NotesListScreen() {
       </Animated.View>
 
       <View style={styles.drivePanel}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumbRow}>
-          <Pressable
-            onPress={() => setCurrentFolderId(undefined)}
-            style={[styles.breadcrumbChip, !currentFolderId && styles.breadcrumbChipActive]}
-          >
-            <MaterialIcons
-              name="home"
-              size={13}
-              color={!currentFolderId ? GlassTheme.accentPrimary : GlassTheme.textTertiary}
-            />
-            <Text style={[styles.breadcrumbText, !currentFolderId && styles.breadcrumbTextActive]}>
-              {ROOT_NAME}
+        <View
+          style={[
+            styles.directoryRow,
+          ]}
+        >
+          <View style={styles.directoryInfo}>
+            <MaterialIcons name="folder-open" size={16} color={GlassTheme.accentPrimary} />
+            <Text style={styles.directoryPath} numberOfLines={1}>
+              {currentPathLabel}
             </Text>
-          </Pressable>
-          {pathFolders.map((folder) => (
-            <Pressable
-              key={folder.id}
-              onPress={() => setCurrentFolderId(folder.id)}
-              style={[styles.breadcrumbChip, currentFolderId === folder.id && styles.breadcrumbChipActive]}
-            >
-              <MaterialIcons
-                name="chevron-right"
-                size={12}
-                color={currentFolderId === folder.id ? GlassTheme.accentPrimary : GlassTheme.textTertiary}
-              />
-              <Text style={[styles.breadcrumbText, currentFolderId === folder.id && styles.breadcrumbTextActive]}>
-                {folder.name}
-              </Text>
+          </View>
+          <View style={styles.directoryActions}>
+            {currentFolderId ? (
+              <Pressable onPress={handleGoUp} style={styles.directoryActionButton}>
+                <MaterialIcons name="arrow-upward" size={16} color={GlassTheme.textSecondary} />
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => setCurrentFolderId(undefined)} style={styles.directoryActionButton}>
+              <MaterialIcons name="home" size={16} color={GlassTheme.textSecondary} />
             </Pressable>
-          ))}
-        </ScrollView>
-
-        <View style={styles.folderHeader}>
-          <Text style={styles.folderTitle}>Folders</Text>
-          <Text style={styles.folderSubtitle}>{folderCountLabel}</Text>
+            <Pressable
+              onPress={() => {
+                setEditingFolderId(null);
+                setFolderName('');
+                setShowFolderModal(true);
+              }}
+              style={styles.directoryActionButton}
+            >
+              <MaterialIcons name="create-new-folder" size={16} color={GlassTheme.textSecondary} />
+            </Pressable>
+          </View>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.folderRow} style={styles.folderScroll}>
-          {childFolders.map((folder) => (
-            <Pressable
-              key={folder.id}
-              onPress={() => setCurrentFolderId(folder.id)}
-              onLongPress={() => handleFolderLongPress(folder)}
-              style={styles.folderChip}
-            >
-              <MaterialIcons name="folder" size={15} color={GlassTheme.textSecondary} />
-              <Text style={styles.folderChipText} numberOfLines={1}>
-                {folder.name}
-              </Text>
-            </Pressable>
-          ))}
-          <Pressable
-            onPress={() => {
-              setEditingFolderId(null);
-              setFolderName('');
-              setShowFolderModal(true);
-            }}
-            style={styles.folderAddChip}
-          >
-            <MaterialIcons name="create-new-folder" size={16} color={GlassTheme.textSecondary} />
-          </Pressable>
-        </ScrollView>
-
-        {draggingNote ? (
+        {draggingItem ? (
           <View style={styles.dragBar}>
             <Text style={styles.dragText} numberOfLines={1}>
-              Dragging: {draggingNote.title}
+              Dragging: {draggingItem.type === 'note' ? draggingItem.note.title : draggingItem.folder.name}
             </Text>
             <View style={styles.dragActions}>
-              <Pressable onPress={() => setDraggingNote(null)} style={styles.dragCancel}>
+              <Pressable onPress={() => setDraggingItem(null)} style={styles.dragCancel}>
                 <Text style={styles.dragCancelText}>Cancel</Text>
               </Pressable>
-              <Pressable onPress={handleDropHere} style={styles.dragDrop}>
+              <Pressable onPress={handleDropCurrent} style={styles.dragDrop}>
                 <Text style={styles.dragDropText}>Drop Here</Text>
               </Pressable>
             </View>
@@ -404,25 +454,96 @@ export default function NotesListScreen() {
       </View>
 
       <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
-
-      <FlatList
-        data={displayedNotes}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => (
-          <NoteListItem
-            note={item}
-            index={index}
-            onPress={() => handleNotePress(item.id)}
-            onLongPress={() => handleNoteLongPress(item)}
-          />
-        )}
-        contentContainerStyle={[styles.listContent, displayedNotes.length === 0 && styles.listEmpty]}
-        ListEmptyComponent={!isLoading ? <EmptyState /> : null}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={loadNotes} tintColor={GlassTheme.accentPrimary} />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      <View
+        ref={listFrameRef}
+        style={styles.listFrame}
+        onLayout={() => {
+          listFrameRef.current?.measureInWindow((x, y) => {
+            setListLeftX(x);
+            setListTopY(y);
+          });
+        }}
+      >
+        <FlatList
+          data={explorerItems}
+          keyExtractor={(item) => (item.type === 'folder' ? `folder_${item.folder.id}` : `note_${item.note.id}`)}
+          renderItem={({ item, index }) => (
+            item.type === 'folder' ? (
+              <Pressable
+                onPress={() => handleOpenFolder(item.folder)}
+                onLongPress={(event) => handleFolderLongPress(item.folder, event)}
+                onTouchMove={(event) => {
+                  if (draggingItem?.type === 'folder' && draggingItem.folder.id === item.folder.id) {
+                    handleDragMove(event.nativeEvent.pageX, event.nativeEvent.pageY);
+                  }
+                }}
+                onTouchEnd={() => {
+                  if (draggingItem?.type === 'folder' && draggingItem.folder.id === item.folder.id) {
+                    finishDrag();
+                  }
+                }}
+                style={[
+                  styles.explorerFolderRow,
+                  draggingItem?.type === 'folder' &&
+                  draggingItem.folder.id === item.folder.id &&
+                  styles.explorerRowDragging,
+                  draggingItem?.overFolderId === item.folder.id && styles.explorerRowDropTarget,
+                ]}
+                onLayout={(event) => {
+                  folderLayouts.set(item.folder.id, event.nativeEvent.layout);
+                }}
+              >
+                <View style={styles.explorerFolderLeft}>
+                  <MaterialIcons name="folder" size={20} color={GlassTheme.accentPrimary} />
+                  <View style={styles.explorerFolderTextWrap}>
+                    <Text style={styles.explorerFolderName} numberOfLines={1}>
+                      {item.folder.name}
+                    </Text>
+                    <Text style={styles.explorerFolderMeta}>
+                      {folderChildCount.get(item.folder.id) ?? 0} subfolders • {folderNoteCount.get(item.folder.id) ?? 0} notes
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.folderRowActions}>
+                  <Pressable
+                    onPress={() => setItemMenu({ type: 'folder', folder: item.folder })}
+                    hitSlop={8}
+                  >
+                    <MaterialIcons name="more-vert" size={18} color={GlassTheme.textTertiary} />
+                  </Pressable>
+                  <MaterialIcons name="chevron-right" size={20} color={GlassTheme.textTertiary} />
+                </View>
+              </Pressable>
+            ) : (
+              <NoteListItem
+                note={item.note}
+                index={index}
+                onPress={() => handleNotePress(item.note.id)}
+                onLongPress={(event) => handleNoteLongPress(item.note, event)}
+                onItemTouchMove={(event) => {
+                  if (draggingItem?.type === 'note' && draggingItem.note.id === item.note.id) {
+                    handleDragMove(event.nativeEvent.pageX, event.nativeEvent.pageY);
+                  }
+                }}
+                onItemTouchEnd={() => {
+                  if (draggingItem?.type === 'note' && draggingItem.note.id === item.note.id) {
+                    finishDrag();
+                  }
+                }}
+                onMenuPress={() => setItemMenu({ type: 'note', note: item.note })}
+              />
+            )
+          )}
+          contentContainerStyle={[styles.listContent, explorerItems.length === 0 && styles.listEmpty]}
+          ListEmptyComponent={!isLoading ? <EmptyState /> : null}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={loadNotes} tintColor={GlassTheme.accentPrimary} />
+          }
+          showsVerticalScrollIndicator={false}
+          onScroll={(event) => setScrollOffsetY(event.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
+        />
+      </View>
 
       <AnimatedPressable
         onPress={handleCreateNote}
@@ -445,12 +566,14 @@ export default function NotesListScreen() {
       </AnimatedPressable>
 
       <Modal visible={showFolderModal} transparent animationType="fade">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
+        <Pressable
+          style={[
+            styles.modalOverlay,
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+          ]}
+          onPress={() => setShowFolderModal(false)}
         >
-          <Pressable style={styles.modalBackdrop} onPress={() => setShowFolderModal(false)} />
-          <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
+          <View style={[styles.modalSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
             <Text style={styles.modalTitle}>{editingFolderId ? 'Rename Folder' : 'New Folder'}</Text>
             <TextInput
               style={styles.modalInput}
@@ -471,8 +594,155 @@ export default function NotesListScreen() {
               </Pressable>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </Pressable>
       </Modal>
+
+      <Modal visible={!!itemMenu} transparent animationType="fade">
+        <Pressable
+          style={[
+            styles.modalOverlay,
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+          ]}
+          onPress={() => setItemMenu(null)}
+        >
+          <View style={[styles.actionSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
+            <Text style={styles.actionSheetTitle}>
+              {itemMenu?.type === 'note' ? itemMenu.note.title : itemMenu?.folder.name}
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {itemMenu?.type === 'note' ? (
+                <>
+                <Pressable
+                  style={styles.actionSheetButton}
+                  onPress={() => {
+                    togglePin(itemMenu.note.id);
+                    setItemMenu(null);
+                  }}
+                >
+                  <MaterialIcons name={itemMenu.note.isPinned ? 'push-pin' : 'push-pin'} size={16} color={GlassTheme.textSecondary} />
+                  <Text style={styles.actionSheetText}>{itemMenu.note.isPinned ? 'Unpin note' : 'Pin note'}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionSheetButton}
+                  onPress={() => {
+                    setDraggingItem({
+                      type: 'note',
+                      note: itemMenu.note,
+                      x: listLeftX + 40,
+                      y: listTopY + 40,
+                    });
+                    setItemMenu(null);
+                  }}
+                >
+                  <MaterialIcons name="open-with" size={16} color={GlassTheme.textSecondary} />
+                  <Text style={styles.actionSheetText}>Start dragging</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionSheetButton}
+                  onPress={() => {
+                    moveToFolder(itemMenu.note.id, currentFolderId);
+                    setItemMenu(null);
+                  }}
+                >
+                  <MaterialIcons name="drive-file-move" size={16} color={GlassTheme.textSecondary} />
+                  <Text style={styles.actionSheetText}>Move to current folder</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.actionSheetButton, styles.actionSheetDanger]}
+                  onPress={() => {
+                    setConfirmDelete({ type: 'note', note: itemMenu.note });
+                    setItemMenu(null);
+                  }}
+                >
+                  <MaterialIcons name="delete-outline" size={16} color={GlassTheme.destructive} />
+                  <Text style={[styles.actionSheetText, styles.actionSheetDangerText]}>Delete note</Text>
+                </Pressable>
+                </>
+              ) : itemMenu?.type === 'folder' ? (
+                <>
+                <Pressable
+                  style={styles.actionSheetButton}
+                  onPress={() => {
+                    setEditingFolderId(itemMenu.folder.id);
+                    setFolderName(itemMenu.folder.name);
+                    setShowFolderModal(true);
+                    setItemMenu(null);
+                  }}
+                >
+                  <MaterialIcons name="edit" size={16} color={GlassTheme.textSecondary} />
+                  <Text style={styles.actionSheetText}>Rename folder</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionSheetButton}
+                  onPress={() => {
+                    setDraggingItem({
+                      type: 'folder',
+                      folder: itemMenu.folder,
+                      x: listLeftX + 40,
+                      y: listTopY + 40,
+                    });
+                    setItemMenu(null);
+                  }}
+                >
+                  <MaterialIcons name="open-with" size={16} color={GlassTheme.textSecondary} />
+                  <Text style={styles.actionSheetText}>Start dragging</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.actionSheetButton, styles.actionSheetDanger]}
+                  onPress={() => {
+                    setConfirmDelete({
+                      type: 'folder',
+                      folder: itemMenu.folder,
+                      noteMoveParentId: itemMenu.folder.parentId,
+                    });
+                    setItemMenu(null);
+                  }}
+                >
+                  <MaterialIcons name="delete-outline" size={16} color={GlassTheme.destructive} />
+                  <Text style={[styles.actionSheetText, styles.actionSheetDangerText]}>Delete folder</Text>
+                </Pressable>
+                </>
+              ) : null}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={!!confirmDelete} transparent animationType="fade">
+        <Pressable
+          style={[
+            styles.modalOverlay,
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+          ]}
+          onPress={() => setConfirmDelete(null)}
+        >
+          <View style={[styles.confirmSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
+            <Text style={styles.confirmTitle}>Confirm delete</Text>
+            <Text style={styles.confirmMessage}>
+              {confirmDelete?.type === 'note'
+                ? 'Delete this note permanently?'
+                : 'Delete this folder and subfolders? Notes inside will move to parent.'}
+            </Text>
+            <View style={styles.confirmActions}>
+              <Pressable style={styles.modalCancel} onPress={() => setConfirmDelete(null)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.modalDanger} onPress={handleConfirmDelete}>
+                <Text style={styles.modalDangerText}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {draggingItem ? (
+        <View pointerEvents="none" style={[styles.dragGhost, { left: ghostLeft, top: ghostTop }]}>
+          <MaterialIcons name={draggingItem.type === 'note' ? 'description' : 'folder'} size={16} color={GlassTheme.accentPrimary} />
+          <Text style={styles.dragGhostText} numberOfLines={1}>
+            {draggingItem.type === 'note' ? draggingItem.note.title : draggingItem.folder.name}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -519,57 +789,63 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10,10,14,0.48)',
     paddingVertical: GlassTheme.spacing.sm,
   },
-  breadcrumbRow: { paddingHorizontal: GlassTheme.spacing.sm, gap: 6, paddingBottom: 8 },
-  breadcrumbChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: GlassTheme.radius.full,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
-    backgroundColor: GlassTheme.glassBackground,
-  },
-  breadcrumbChipActive: {
-    backgroundColor: 'rgba(139,92,246,0.15)',
-    borderColor: 'rgba(139,92,246,0.4)',
-  },
-  breadcrumbText: { fontSize: 12, color: GlassTheme.textTertiary, fontWeight: '600' },
-  breadcrumbTextActive: { color: GlassTheme.accentPrimary },
-  folderHeader: {
+  directoryRow: {
     paddingHorizontal: GlassTheme.spacing.md,
-    paddingBottom: 6,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  folderTitle: { color: GlassTheme.textPrimary, fontSize: 13, fontWeight: '700' },
-  folderSubtitle: { color: GlassTheme.textTertiary, fontSize: 12 },
-  folderScroll: { flexGrow: 0 },
-  folderRow: { paddingHorizontal: GlassTheme.spacing.md, gap: 8 },
-  folderChip: {
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: GlassTheme.radius.full,
-    backgroundColor: GlassTheme.glassBackground,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
-    maxWidth: 180,
+    gap: 10,
   },
-  folderChipText: { fontSize: 12, fontWeight: '600', color: GlassTheme.textSecondary },
-  folderAddChip: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  directoryInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
+  directoryPath: {
+    color: GlassTheme.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  directoryActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  directoryActionButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: GlassTheme.glassBackground,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
+  },
+  listFrame: { flex: 1 },
+  explorerFolderRow: {
+    marginHorizontal: GlassTheme.spacing.md,
+    marginVertical: 4,
+    borderRadius: GlassTheme.radius.lg,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+    backgroundColor: GlassTheme.glassBackground,
+    paddingHorizontal: GlassTheme.spacing.md,
+    paddingVertical: GlassTheme.spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  folderRowActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  explorerFolderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
+  explorerFolderTextWrap: { flex: 1, minWidth: 0 },
+  explorerFolderName: { color: GlassTheme.textPrimary, fontSize: 15, fontWeight: '700' },
+  explorerFolderMeta: { color: GlassTheme.textTertiary, fontSize: 12, marginTop: 1 },
+  explorerRowDragging: { opacity: 0.35 },
+  explorerRowDropTarget: {
+    borderColor: 'rgba(139, 92, 246, 0.7)',
+    backgroundColor: 'rgba(139, 92, 246, 0.18)',
   },
   dragBar: {
     marginTop: 10,
@@ -613,12 +889,9 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
   },
   modalSheet: {
     backgroundColor: GlassTheme.backgroundElevated,
@@ -659,4 +932,96 @@ const styles = StyleSheet.create({
     backgroundColor: GlassTheme.accentPrimary,
   },
   modalSaveText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  modalDanger: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: GlassTheme.radius.md,
+    backgroundColor: 'rgba(239,68,68,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.45)',
+  },
+  modalDangerText: { fontSize: 14, fontWeight: '700', color: GlassTheme.destructive },
+  actionSheet: {
+    width: '88%',
+    borderRadius: GlassTheme.radius.xl,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+    backgroundColor: GlassTheme.backgroundElevated,
+    padding: GlassTheme.spacing.md,
+    gap: 4,
+  },
+  actionSheetTitle: {
+    color: GlassTheme.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  actionSheetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: GlassTheme.radius.md,
+    backgroundColor: GlassTheme.glassBackground,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+    paddingHorizontal: GlassTheme.spacing.md,
+    paddingVertical: GlassTheme.spacing.sm + 1,
+    marginBottom: 8,
+  },
+  actionSheetText: {
+    color: GlassTheme.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  actionSheetDanger: {
+    borderColor: 'rgba(239,68,68,0.35)',
+    backgroundColor: 'rgba(239,68,68,0.1)',
+  },
+  actionSheetDangerText: {
+    color: GlassTheme.destructive,
+  },
+  confirmSheet: {
+    width: '84%',
+    borderRadius: GlassTheme.radius.xl,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+    backgroundColor: GlassTheme.backgroundElevated,
+    padding: GlassTheme.spacing.lg,
+  },
+  confirmTitle: {
+    color: GlassTheme.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  confirmMessage: {
+    color: GlassTheme.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: GlassTheme.spacing.lg,
+  },
+  dragGhost: {
+    position: 'absolute',
+    width: 180,
+    borderRadius: GlassTheme.radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(139,92,246,0.55)',
+    backgroundColor: 'rgba(17,24,39,0.92)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dragGhostText: {
+    color: GlassTheme.textPrimary,
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
 });

@@ -12,6 +12,7 @@ type FormattingToolbarProps = {
   onBullet: () => void;
   onChecklist: () => void;
   onDivider: () => void;
+  onPhoto: () => void;
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -63,6 +64,7 @@ export function FormattingToolbar({
   onBullet,
   onChecklist,
   onDivider,
+  onPhoto,
 }: FormattingToolbarProps) {
   return (
     <GlassCard noPadding style={styles.container}>
@@ -75,6 +77,7 @@ export function FormattingToolbar({
         <ToolbarButton icon="check-box" onAction={onChecklist} color={GlassTheme.accentPrimary} />
         <View style={styles.separator} />
         <ToolbarButton icon="horizontal-rule" onAction={onDivider} />
+        <ToolbarButton icon="add-a-photo" onAction={onPhoto} color={GlassTheme.accentPrimary} />
       </View>
     </GlassCard>
   );

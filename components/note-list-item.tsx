@@ -18,7 +18,10 @@ type NoteListItemProps = {
   note: NotePreview;
   index: number;
   onPress: () => void;
-  onLongPress: () => void;
+  onLongPress: (event: any) => void;
+  onMenuPress?: () => void;
+  onItemTouchMove?: (event: any) => void;
+  onItemTouchEnd?: (event: any) => void;
 };
 
 function formatDate(timestamp: number): string {
@@ -39,7 +42,15 @@ function getNoteColor(colorId: string) {
   return NOTE_COLORS.find((c) => c.id === colorId) ?? NOTE_COLORS[0];
 }
 
-export function NoteListItem({ note, index, onPress, onLongPress }: NoteListItemProps) {
+export function NoteListItem({
+  note,
+  index,
+  onPress,
+  onLongPress,
+  onMenuPress,
+  onItemTouchMove,
+  onItemTouchEnd,
+}: NoteListItemProps) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -50,13 +61,14 @@ export function NoteListItem({ note, index, onPress, onLongPress }: NoteListItem
     scale.value = withSpring(0.96, { damping: 15, stiffness: 400 });
   };
 
-  const handlePressOut = () => {
+  const handlePressOut = (event: any) => {
     scale.value = withSpring(1, { damping: 12, stiffness: 200 });
+    onItemTouchEnd?.(event);
   };
 
-  const handleLongPress = () => {
+  const handleLongPress = (event: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onLongPress();
+    onLongPress(event);
   };
 
   const noteColor = getNoteColor(note.colorId);
@@ -69,6 +81,8 @@ export function NoteListItem({ note, index, onPress, onLongPress }: NoteListItem
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onLongPress={handleLongPress}
+        onTouchMove={onItemTouchMove}
+        onTouchEnd={onItemTouchEnd}
         style={[styles.wrapper, animatedStyle]}
       >
         <GlassCard accentColor={note.colorId !== 'default' ? noteColor.accent : undefined}>
@@ -76,9 +90,16 @@ export function NoteListItem({ note, index, onPress, onLongPress }: NoteListItem
             <Text style={styles.title} numberOfLines={1}>
               {note.title || 'Untitled'}
             </Text>
-            {note.isPinned && (
-              <MaterialIcons name="push-pin" size={14} color={GlassTheme.accentPrimary} />
-            )}
+            <View style={styles.headerActions}>
+              {note.isPinned && (
+                <MaterialIcons name="push-pin" size={14} color={GlassTheme.accentPrimary} />
+              )}
+              {onMenuPress ? (
+                <Pressable onPress={onMenuPress} hitSlop={8}>
+                  <MaterialIcons name="more-vert" size={16} color={GlassTheme.textTertiary} />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
 
           {note.preview.length > 0 && (
@@ -127,6 +148,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: GlassTheme.spacing.sm,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   title: {
     flex: 1,
