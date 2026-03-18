@@ -17,6 +17,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 type NoteListItemProps = {
   note: NotePreview;
   index: number;
+  width?: number;
   onPress: () => void;
   onLongPress: (event: any) => void;
   onMenuPress?: () => void;
@@ -45,6 +46,7 @@ function getNoteColor(colorId: string) {
 export function NoteListItem({
   note,
   index,
+  width,
   onPress,
   onLongPress,
   onMenuPress,
@@ -75,7 +77,7 @@ export function NoteListItem({
   const hasChecklist = note.checklistTotal > 0;
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 60).duration(400).springify()}>
+    <Animated.View entering={FadeInDown.delay(index * 60).duration(400).springify()} style={{ width }}>
       <AnimatedPressable
         onPress={onPress}
         onPressIn={handlePressIn}
@@ -85,52 +87,30 @@ export function NoteListItem({
         onTouchEnd={onItemTouchEnd}
         style={[styles.wrapper, animatedStyle]}
       >
-        <GlassCard accentColor={note.colorId !== 'default' ? noteColor.accent : undefined}>
-          <View style={styles.header}>
-            <Text style={styles.title} numberOfLines={1}>
-              {note.title || 'Untitled'}
-            </Text>
-            <View style={styles.headerActions}>
-              {note.isPinned && (
-                <MaterialIcons name="push-pin" size={14} color={GlassTheme.accentPrimary} />
-              )}
-              {onMenuPress ? (
-                <Pressable onPress={onMenuPress} hitSlop={8}>
-                  <MaterialIcons name="more-vert" size={16} color={GlassTheme.textTertiary} />
-                </Pressable>
-              ) : null}
+        <GlassCard accentColor={note.colorId !== 'default' ? noteColor.accent : undefined} style={{ borderRadius: GlassTheme.radius.xxl }}>
+          <View style={styles.innerContainer}>
+            <View style={styles.header}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <MaterialIcons name="description" size={18} color="rgba(255, 255, 255, 0.9)" />
+                <Text style={styles.title} numberOfLines={2}>
+                  {note.title || 'Untitled'}
+                </Text>
+              </View>
+              <View style={styles.headerActions}>
+                {note.isPinned && (
+                  <MaterialIcons name="push-pin" size={14} color={GlassTheme.accentPrimary} />
+                )}
+                {onMenuPress ? (
+                  <Pressable onPress={onMenuPress} hitSlop={12}>
+                    <MaterialIcons name="more-horiz" size={22} color="rgba(255, 255, 255, 0.6)" />
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
-          </View>
 
-          {note.preview.length > 0 && (
-            <Text style={styles.preview} numberOfLines={2}>
-              {note.preview}
-            </Text>
-          )}
-
-          {hasChecklist && (
-            <View style={styles.checklistBadge}>
-              <MaterialIcons
-                name={note.checklistDone === note.checklistTotal ? 'check-circle' : 'radio-button-unchecked'}
-                size={14}
-                color={note.checklistDone === note.checklistTotal ? GlassTheme.success : GlassTheme.textTertiary}
-              />
-              <Text
-                style={[
-                  styles.checklistText,
-                  note.checklistDone === note.checklistTotal && styles.checklistDone,
-                ]}
-              >
-                {note.checklistDone}/{note.checklistTotal}
-              </Text>
+            <View style={styles.centerContent}>
+              <MaterialIcons name="description" size={48} color="rgba(255, 255, 255, 0.15)" />
             </View>
-          )}
-
-          <View style={styles.footer}>
-            <Text style={styles.date}>{formatDate(note.updatedAt)}</Text>
-            {note.wordCount > 0 && (
-              <Text style={styles.wordCount}>{note.wordCount} words</Text>
-            )}
           </View>
         </GlassCard>
       </AnimatedPressable>
@@ -139,65 +119,37 @@ export function NoteListItem({
 }
 
 const styles = StyleSheet.create({
+  animatedStyle: {
+    // animated styles apply here
+  },
   wrapper: {
-    marginHorizontal: GlassTheme.spacing.md,
-    marginBottom: GlassTheme.spacing.sm + 2,
+    marginBottom: GlassTheme.spacing.md,
+  },
+  innerContainer: {
+    height: 110, // Match the height of folder card for a uniform compact grid
+    justifyContent: 'space-between',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: GlassTheme.spacing.sm,
+  },
+  title: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: GlassTheme.textPrimary,
+    letterSpacing: -0.2,
+  },
+  centerContent: {
+    alignSelf: 'center',
+    marginTop: 'auto',
+    marginBottom: 'auto',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  title: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '600',
-    color: GlassTheme.textPrimary,
-    letterSpacing: -0.2,
-  },
-  preview: {
-    fontSize: 14,
-    color: GlassTheme.textSecondary,
-    marginTop: GlassTheme.spacing.xs + 2,
-    lineHeight: 20,
-  },
-  checklistBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: GlassTheme.spacing.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: GlassTheme.radius.full,
-  },
-  checklistText: {
-    fontSize: 12,
-    color: GlassTheme.textTertiary,
-    fontWeight: '500',
-  },
-  checklistDone: {
-    color: GlassTheme.success,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: GlassTheme.spacing.sm,
-  },
-  date: {
-    fontSize: 12,
-    color: GlassTheme.textTertiary,
-  },
-  wordCount: {
-    fontSize: 12,
-    color: GlassTheme.textTertiary,
   },
 });

@@ -247,7 +247,7 @@ export default function EditorScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: GlassTheme.backgroundPrimary }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
@@ -408,7 +408,7 @@ export default function EditorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: GlassTheme.backgroundPrimary,
+    backgroundColor: '#000000',
   },
   header: {
     flexDirection: 'row',

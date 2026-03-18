@@ -105,37 +105,17 @@ export default function NotesListScreen() {
 
   const fabScale = useSharedValue(1);
   const fabRotation = useSharedValue(0);
-  const orbFloat = useSharedValue(0);
-  const orbFloat2 = useSharedValue(0);
   const listFrameRef = useRef<View>(null);
 
   useFocusEffect(
     useCallback(() => {
       loadNotes();
       loadFolders();
-      orbFloat.value = withRepeat(
-        withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.ease) }),
-        -1,
-        true,
-      );
-      orbFloat2.value = withRepeat(
-        withTiming(1, { duration: 8000, easing: Easing.inOut(Easing.ease) }),
-        -1,
-        true,
-      );
     }, [loadNotes, loadFolders]),
   );
 
   const fabStyle = useAnimatedStyle(() => ({
     transform: [{ scale: fabScale.value }, { rotate: `${fabRotation.value}deg` }],
-  }));
-  const orbStyle1 = useAnimatedStyle(() => ({
-    transform: [{ translateY: orbFloat.value * -20 }, { translateX: orbFloat.value * 10 }],
-    opacity: 0.4 + orbFloat.value * 0.2,
-  }));
-  const orbStyle2 = useAnimatedStyle(() => ({
-    transform: [{ translateY: orbFloat2.value * 15 }, { translateX: orbFloat2.value * -15 }],
-    opacity: 0.3 + orbFloat2.value * 0.15,
   }));
 
   const folderMap = useMemo(
@@ -230,12 +210,20 @@ export default function NotesListScreen() {
 
   const resolveDropTarget = useCallback(
     (pageX: number, pageY: number): string | null => {
+      // Memberikan toleransi drag coordinate (sepadan dengan offset di Android / hit slop)
+      const HIT_SLOP = 45; 
       for (const folder of displayedFolders) {
         const layout = folderLayouts.get(folder.id);
         if (!layout) continue;
         const y = listTopY + layout.y - scrollOffsetY;
         const x = listLeftX + layout.x;
-        if (pageX >= x && pageX <= x + layout.width && pageY >= y && pageY <= y + layout.height) {
+        // Pengecekan tabrakan (collision) yang lebih longgar 
+        if (
+          pageX >= x - HIT_SLOP &&
+          pageX <= x + layout.width + HIT_SLOP &&
+          pageY >= y - HIT_SLOP &&
+          pageY <= y + layout.height + HIT_SLOP
+        ) {
           return folder.id;
         }
       }
@@ -378,52 +366,35 @@ export default function NotesListScreen() {
     ? Math.min(Math.max(draggingItem.y - 24, insets.top + 8), windowHeight - (insets.bottom + 64))
     : 0;
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <LinearGradient
-        colors={['rgba(139, 92, 246, 0.08)', 'rgba(99, 102, 241, 0.03)', 'transparent']}
-        style={styles.gradient}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.8, y: 1 }}
-      />
-      <Animated.View style={[styles.orb1, orbStyle1]} />
-      <Animated.View style={[styles.orb2, orbStyle2]} />
+  const cardWidth = (windowWidth - GlassTheme.spacing.md * 3) / 2;
 
-      <Animated.View entering={FadeIn.duration(600)} style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Image source={require('../../assets/logo.jpeg')} style={styles.logo} />
-          <View>
-            <Text style={styles.headerTitle}>GlassNotes</Text>
-            <Text style={styles.headerSubtitle}>
-              {displayedFolders.length} {displayedFolders.length === 1 ? 'folder' : 'folders'}
-              {'  •  '}
-              {displayedNotes.length} {displayedNotes.length === 1 ? 'note' : 'notes'}
-              {pinnedCount > 0 ? `  \u2022  ${pinnedCount} pinned` : ''}
-            </Text>
-          </View>
-        </View>
-      </Animated.View>
+  return (
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: GlassTheme.backgroundPrimary }]}>
+      <View style={styles.topActionsContainer}>
+        <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+      </View>
 
       <View style={styles.drivePanel}>
-        <View
-          style={[
-            styles.directoryRow,
-          ]}
-        >
+        <View style={styles.directoryRow}>
           <View style={styles.directoryInfo}>
-            <MaterialIcons name="folder-open" size={16} color={GlassTheme.accentPrimary} />
-            <Text style={styles.directoryPath} numberOfLines={1}>
-              {currentPathLabel}
-            </Text>
+            <MaterialIcons name="folder-open" size={24} color={GlassTheme.accentPrimary} />
+            <View>
+              <Text style={styles.directoryPath} numberOfLines={1}>
+                {currentPathLabel}
+              </Text>
+              <Text style={styles.directoryStats}>
+                {displayedFolders.length} folders • {displayedNotes.length} notes
+              </Text>
+            </View>
           </View>
           <View style={styles.directoryActions}>
             {currentFolderId ? (
               <Pressable onPress={handleGoUp} style={styles.directoryActionButton}>
-                <MaterialIcons name="arrow-upward" size={16} color={GlassTheme.textSecondary} />
+                <MaterialIcons name="arrow-upward" size={20} color={GlassTheme.textSecondary} />
               </Pressable>
             ) : null}
             <Pressable onPress={() => setCurrentFolderId(undefined)} style={styles.directoryActionButton}>
-              <MaterialIcons name="home" size={16} color={GlassTheme.textSecondary} />
+              <MaterialIcons name="home" size={22} color={GlassTheme.textSecondary} />
             </Pressable>
             <Pressable
               onPress={() => {
@@ -433,7 +404,7 @@ export default function NotesListScreen() {
               }}
               style={styles.directoryActionButton}
             >
-              <MaterialIcons name="create-new-folder" size={16} color={GlassTheme.textSecondary} />
+              <MaterialIcons name="create-new-folder" size={22} color={GlassTheme.textSecondary} />
             </Pressable>
           </View>
         </View>
@@ -455,7 +426,6 @@ export default function NotesListScreen() {
         ) : null}
       </View>
 
-      <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
       <View
         ref={listFrameRef}
         style={styles.listFrame}
@@ -468,15 +438,19 @@ export default function NotesListScreen() {
           finishDrag();
         }}
         onLayout={() => {
-          listFrameRef.current?.measureInWindow((x, y) => {
-            setListLeftX(x);
-            setListTopY(y);
-          });
+          setTimeout(() => {
+            listFrameRef.current?.measureInWindow((x, y) => {
+              setListLeftX(x);
+              setListTopY(y);
+            });
+          }, 150);
         }}
       >
         <FlatList
           data={explorerItems}
           keyExtractor={(item) => (item.type === 'folder' ? `folder_${item.folder.id}` : `note_${item.note.id}`)}
+          numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
           renderItem={({ item, index }) => (
             item.type === 'folder' ? (
               <Pressable
@@ -494,6 +468,7 @@ export default function NotesListScreen() {
                 }}
                 style={[
                   styles.explorerFolderRow,
+                  { width: cardWidth },
                   draggingItem?.type === 'folder' &&
                   draggingItem.folder.id === item.folder.id &&
                   styles.explorerRowDragging,
@@ -503,26 +478,28 @@ export default function NotesListScreen() {
                   folderLayouts.set(item.folder.id, event.nativeEvent.layout);
                 }}
               >
-                <GlassCard accentColor={GlassTheme.accentPrimary}>
+                <GlassCard accentColor={GlassTheme.accentPrimary} style={{ borderRadius: GlassTheme.radius.xxl }}>
                   <View style={styles.explorerFolderInner}>
-                    <View style={styles.explorerFolderLeft}>
-                      <MaterialIcons name="folder" size={20} color={GlassTheme.accentPrimary} />
-                      <View style={styles.explorerFolderTextWrap}>
-                        <Text style={styles.explorerFolderName} numberOfLines={1}>
-                          {item.folder.name}
-                        </Text>
-                        <Text style={styles.explorerFolderMeta}>
-                          {folderChildCount.get(item.folder.id) ?? 0} subfolders • {folderNoteCount.get(item.folder.id) ?? 0} notes
-                        </Text>
+                    <View style={styles.explorerFolderHeader}>
+                      <View style={styles.explorerFolderHeaderLeft}>
+                        <MaterialIcons name="folder" size={18} color="rgba(255, 255, 255, 0.9)" />
+                        <View style={styles.explorerFolderTextWrap}>
+                          <Text style={styles.explorerFolderName} numberOfLines={2}>
+                            {item.folder.name}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.folderRowActions}>
+                        <Pressable
+                          onPress={() => setItemMenu({ type: 'folder', folder: item.folder })}
+                          hitSlop={12}
+                        >
+                          <MaterialIcons name="more-horiz" size={22} color="rgba(255, 255, 255, 0.6)" />
+                        </Pressable>
                       </View>
                     </View>
-                    <View style={styles.folderRowActions}>
-                      <Pressable
-                        onPress={() => setItemMenu({ type: 'folder', folder: item.folder })}
-                        hitSlop={8}
-                      >
-                        <MaterialIcons name="more-vert" size={18} color={GlassTheme.textTertiary} />
-                      </Pressable>
+                    <View style={styles.explorerFolderCenterIcon}>
+                      <MaterialIcons name="folder" size={56} color="rgba(255, 255, 255, 0.15)" />
                     </View>
                   </View>
                 </GlassCard>
@@ -531,6 +508,7 @@ export default function NotesListScreen() {
               <NoteListItem
                 note={item.note}
                 index={index}
+                width={cardWidth}
                 onPress={() => {
                   if (draggingItem) return;
                   handleNotePress(item.note.id);
@@ -764,98 +742,98 @@ export default function NotesListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: GlassTheme.backgroundPrimary },
-  gradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 300 },
-  orb1: {
-    position: 'absolute',
-    top: 60,
-    right: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+  container: { flex: 1, backgroundColor: '#000000' },
+  topActionsContainer: {
+    paddingHorizontal: GlassTheme.spacing.md,
+    marginTop: GlassTheme.spacing.md,
+    marginBottom: GlassTheme.spacing.sm,
   },
-  orb2: {
-    position: 'absolute',
-    top: 160,
-    left: -40,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(99, 102, 241, 0.06)',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: GlassTheme.spacing.lg,
-    paddingTop: GlassTheme.spacing.lg,
-    paddingBottom: GlassTheme.spacing.md,
-  },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: GlassTheme.spacing.sm },
-  logo: { width: 40, height: 40, borderRadius: GlassTheme.radius.md },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: GlassTheme.textPrimary, letterSpacing: -0.8 },
-  headerSubtitle: { fontSize: 13, color: GlassTheme.textTertiary, marginTop: 1 },
   drivePanel: {
     marginHorizontal: GlassTheme.spacing.md,
-    marginBottom: GlassTheme.spacing.sm,
+    marginBottom: GlassTheme.spacing.md,
     borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
-    borderRadius: GlassTheme.radius.lg,
-    backgroundColor: 'rgba(10,10,14,0.48)',
-    paddingVertical: GlassTheme.spacing.sm,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 40, 
+    backgroundColor: 'rgba(15, 15, 15, 0.8)', // extremely dark pill 
+    paddingVertical: GlassTheme.spacing.md,
+    paddingHorizontal: GlassTheme.spacing.sm,
+    flexDirection: 'row', // to align the whole bar directly
   },
   directoryRow: {
-    paddingHorizontal: GlassTheme.spacing.md,
-    paddingBottom: 8,
+    paddingHorizontal: GlassTheme.spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
+    flex: 1,
   },
   directoryInfo: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 12,
     minWidth: 0,
   },
   directoryPath: {
-    color: GlassTheme.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#FFFFFF', // pure white for My Drive
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 0,
+  },
+  directoryStats: {
+    color: GlassTheme.textTertiary,
+    fontSize: 13,
+    fontWeight: '500',
   },
   directoryActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   directoryActionButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: GlassTheme.glassBackground,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)', // visible circle buttons inside pill
     borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   listFrame: { flex: 1 },
+  columnWrapper: {
+    justifyContent: 'flex-start',
+    paddingHorizontal: GlassTheme.spacing.md,
+    gap: GlassTheme.spacing.md,
+  },
   explorerFolderRow: {
-    marginHorizontal: GlassTheme.spacing.md,
-    marginVertical: 4,
-    borderRadius: GlassTheme.radius.lg,
+    marginBottom: GlassTheme.spacing.md,
+    borderRadius: GlassTheme.radius.xxl,
   },
   explorerFolderInner: {
+    height: 110, // consistent compact height for grid
+    justifyContent: 'space-between',
+  },
+  explorerFolderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 10,
+    alignItems: 'flex-start',
   },
-  folderRowActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  explorerFolderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
+  explorerFolderHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  folderRowActions: {
+    marginLeft: 4,
+  },
+  explorerFolderCenterIcon: {
+    alignSelf: 'center',
+    marginTop: 'auto',
+    marginBottom: 'auto',
+  },
   explorerFolderTextWrap: { flex: 1, minWidth: 0 },
-  explorerFolderName: { color: GlassTheme.textPrimary, fontSize: 15, fontWeight: '700' },
-  explorerFolderMeta: { color: GlassTheme.textTertiary, fontSize: 12, marginTop: 1 },
+  explorerFolderName: { color: GlassTheme.textPrimary, fontSize: 14, fontWeight: '600' },
   explorerRowDragging: { opacity: 0.35 },
   explorerRowDropTarget: {
     borderColor: 'rgba(139, 92, 246, 0.7)',

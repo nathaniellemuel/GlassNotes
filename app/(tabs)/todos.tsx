@@ -145,12 +145,7 @@ export default function TodosScreen() {
   const totalCount = filteredTodos.length;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <LinearGradient
-        colors={['rgba(245, 158, 11, 0.06)', 'transparent']}
-        style={styles.gradient}
-      />
-
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: GlassTheme.backgroundPrimary }]}>
       <Animated.View entering={FadeIn.duration(600)} style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>To-Do</Text>
@@ -185,6 +180,19 @@ export default function TodosScreen() {
             onToggle={() => toggleTodo(item.id)}
             onPress={() => openEditModal(item)}
             onLongPress={() => handleLongPress(item)}
+            onDelete={() => {
+              Alert.alert('Delete Task', 'Are you sure you want to delete this task?', [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: () => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                    deleteTodo(item.id);
+                  },
+                },
+              ]);
+            }}
           />
         )}
         contentContainerStyle={[styles.listContent, filteredTodos.length === 0 && styles.listEmpty]}
@@ -213,8 +221,10 @@ export default function TodosScreen() {
         style={[styles.fab, { bottom: insets.bottom + 86 }]}
       >
         <LinearGradient
-          colors={['#F59E0B', '#D97706']}
+          colors={[GlassTheme.accentPrimary, GlassTheme.accentSecondary]}
           style={styles.fabGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
           <MaterialIcons name="add" size={24} color="#FFFFFF" />
         </LinearGradient>
@@ -324,14 +334,7 @@ export default function TodosScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: GlassTheme.backgroundPrimary,
-  },
-  gradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200,
+    backgroundColor: '#000000',
   },
   header: {
     paddingHorizontal: GlassTheme.spacing.lg,
@@ -401,19 +404,15 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: GlassTheme.spacing.lg,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    ...GlassTheme.shadowPrimary,
   },
   fabGradient: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
   },

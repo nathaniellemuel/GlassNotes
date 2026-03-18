@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, { FadeIn, useAnimatedStyle, withSpring, useSharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { GlassCard } from '@/components/glass-card';
 import { GlassTheme } from '@/constants/theme';
 import { TODO_PRIORITIES } from '@/types/todo';
 import type { Todo } from '@/types/todo';
@@ -12,6 +13,7 @@ interface Props {
   onToggle: () => void;
   onPress: () => void;
   onLongPress: () => void;
+  onDelete: () => void;
 }
 
 function formatDate(ts: number): string {
@@ -30,7 +32,7 @@ function formatDate(ts: number): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function TodoItem({ todo, index, onToggle, onPress, onLongPress }: Props) {
+export function TodoItem({ todo, index, onToggle, onPress, onLongPress, onDelete }: Props) {
   const scale = useSharedValue(1);
   const priority = TODO_PRIORITIES.find((p) => p.id === todo.priority) ?? TODO_PRIORITIES[1];
   const isOverdue =
@@ -51,102 +53,102 @@ export function TodoItem({ todo, index, onToggle, onPress, onLongPress }: Props)
   return (
     <Animated.View
       entering={FadeIn.delay(index * 40).duration(300)}
-      style={animStyle}
+      style={[animStyle, styles.containerMargin]}
     >
-      <Pressable
-        onPress={onPress}
-        onLongPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          onLongPress();
-        }}
-        style={styles.container}
-      >
-        {/* Priority bar */}
-        <View style={[styles.priorityBar, { backgroundColor: priority.color }]} />
-
-        <Pressable onPress={handleToggle} style={styles.checkbox} hitSlop={8}>
-          <View
-            style={[
-              styles.checkboxCircle,
-              todo.completed && styles.checkboxCircleChecked,
-              todo.completed && { borderColor: priority.color, backgroundColor: priority.color + '30' },
-            ]}
-          >
-            {todo.completed && (
-              <MaterialIcons name="check" size={14} color={priority.color} />
-            )}
-          </View>
-        </Pressable>
-
-        <View style={styles.content}>
-          <Text
-            style={[styles.title, todo.completed && styles.titleCompleted]}
-            numberOfLines={2}
-          >
-            {todo.title || 'Untitled task'}
-          </Text>
-
-          {!!todo.description && (
-            <Text style={styles.description} numberOfLines={1}>
-              {todo.description}
-            </Text>
-          )}
-
-          <View style={styles.meta}>
-            <View style={[styles.priorityBadge, { backgroundColor: priority.color + '20' }]}>
-              <Text style={[styles.priorityLabel, { color: priority.color }]}>
-                {priority.label}
-              </Text>
+      <GlassCard noPadding style={{ borderRadius: GlassTheme.radius.xl }} accentColor={priority.color}>
+        <View style={styles.container}>
+          <Pressable onPress={handleToggle} style={styles.checkbox} hitSlop={15}>
+            <View
+              style={[
+                styles.checkboxCircle,
+                todo.completed && styles.checkboxCircleChecked,
+                todo.completed && { borderColor: priority.color, backgroundColor: priority.color + '30' },
+              ]}
+            >
+              {todo.completed && (
+                <MaterialIcons name="check" size={14} color={priority.color} />
+              )}
             </View>
+          </Pressable>
 
-            {todo.dueDate && (
-              <View style={styles.metaItem}>
-                <MaterialIcons
-                  name="schedule"
-                  size={11}
-                  color={isOverdue ? GlassTheme.destructive : GlassTheme.textTertiary}
-                />
-                <Text
-                  style={[
-                    styles.metaText,
-                    isOverdue && { color: GlassTheme.destructive },
-                  ]}
-                >
-                  {formatDate(todo.dueDate)}
-                </Text>
-              </View>
+          <Pressable
+            onPress={onPress}
+            onLongPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onLongPress();
+            }}
+            style={styles.content}
+          >
+            <Text
+              style={[styles.title, todo.completed && styles.titleCompleted]}
+              numberOfLines={2}
+            >
+              {todo.title || 'Untitled task'}
+            </Text>
+
+            {!!todo.description && (
+              <Text style={styles.description} numberOfLines={1}>
+                {todo.description}
+              </Text>
             )}
 
-            {todo.reminderAt && !todo.completed && (
-              <View style={styles.metaItem}>
-                <MaterialIcons name="notifications" size={11} color={GlassTheme.accentPrimary} />
-                <Text style={[styles.metaText, { color: GlassTheme.accentPrimary }]}>
-                  Reminder set
+            <View style={styles.meta}>
+              <View style={[styles.priorityBadge, { backgroundColor: priority.color + '20' }]}>
+                <Text style={[styles.priorityLabel, { color: priority.color }]}>
+                  {priority.label}
                 </Text>
               </View>
-            )}
-          </View>
+
+              {todo.dueDate && (
+                <View style={styles.metaItem}>
+                  <MaterialIcons
+                    name="schedule"
+                    size={11}
+                    color={isOverdue ? GlassTheme.destructive : GlassTheme.textTertiary}
+                  />
+                  <Text
+                    style={[
+                      styles.metaText,
+                      isOverdue && { color: GlassTheme.destructive },
+                    ]}
+                  >
+                    {formatDate(todo.dueDate)}
+                  </Text>
+                </View>
+              )}
+
+              {todo.reminderAt && !todo.completed && (
+                <View style={styles.metaItem}>
+                  <MaterialIcons name="notifications" size={11} color={GlassTheme.accentPrimary} />
+                  <Text style={[styles.metaText, { color: GlassTheme.accentPrimary }]}>
+                    Reminder set
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Pressable>
+          
+          <Pressable 
+            onPress={onDelete} 
+            style={styles.deleteButton}
+            hitSlop={15}
+          >
+            <MaterialIcons name="delete-outline" size={20} color={GlassTheme.destructive} />
+          </Pressable>
         </View>
-      </Pressable>
+      </GlassCard>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  containerMargin: {
+    marginHorizontal: GlassTheme.spacing.md,
+    marginVertical: 6,
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: GlassTheme.glassBackground,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
-    borderRadius: GlassTheme.radius.lg,
-    marginHorizontal: GlassTheme.spacing.md,
-    marginVertical: 4,
-    overflow: 'hidden',
-  },
-  priorityBar: {
-    width: 3,
-    alignSelf: 'stretch',
   },
   checkbox: {
     padding: GlassTheme.spacing.md,
@@ -211,5 +213,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: GlassTheme.textTertiary,
     fontWeight: '500',
+  },
+  deleteButton: {
+    padding: GlassTheme.spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

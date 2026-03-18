@@ -2,6 +2,8 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GlassTheme } from '@/constants/theme';
 
+import { GlassCard } from '@/components/glass-card';
+
 interface DayEvent {
   id: string;
   title: string;
@@ -53,8 +55,9 @@ export function CalendarView({ selectedDate, onSelectDate, getEventsForDate }: P
   };
 
   return (
-    <View style={styles.container}>
-      {/* Month navigation */}
+    <GlassCard style={styles.containerWrap} noPadding>
+      <View style={{ padding: GlassTheme.spacing.md }}>
+        {/* Month navigation */}
       <View style={styles.header}>
         <Pressable onPress={goToPrevMonth} style={styles.navBtn} hitSlop={8}>
           <MaterialIcons name="chevron-left" size={24} color={GlassTheme.textPrimary} />
@@ -132,18 +135,14 @@ export function CalendarView({ selectedDate, onSelectDate, getEventsForDate }: P
           <Text style={styles.todayBtnText}>Today</Text>
         </Pressable>
       )}
-    </View>
+      </View>
+    </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: GlassTheme.glassBackground,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
-    borderRadius: GlassTheme.radius.xl,
+  containerWrap: {
     marginHorizontal: GlassTheme.spacing.md,
-    padding: GlassTheme.spacing.md,
   },
   header: {
     flexDirection: 'row',

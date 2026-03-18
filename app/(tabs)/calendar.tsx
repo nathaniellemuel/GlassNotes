@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { GlassTheme } from '@/constants/theme';
+import { GlassCard } from '@/components/glass-card';
 import { useNotes } from '@/hooks/use-notes';
 import { useTodos } from '@/hooks/use-todos';
 import { CalendarView } from '@/components/calendar-view';
@@ -95,12 +96,7 @@ export default function CalendarScreen() {
     : selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <LinearGradient
-        colors={['rgba(34, 197, 94, 0.06)', 'transparent']}
-        style={styles.gradient}
-      />
-
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: GlassTheme.backgroundPrimary }]}>
       <Animated.View entering={FadeIn.duration(600)} style={styles.header}>
         <Text style={styles.headerTitle}>Calendar</Text>
         <Text style={styles.headerSubtitle}>
@@ -151,22 +147,25 @@ export default function CalendarScreen() {
                 return (
                   <Pressable
                     key={note.id}
-                    style={styles.eventCard}
                     onPress={() => router.push({ pathname: '/editor', params: { id: note.id } })}
                   >
-                    <View
-                      style={[
-                        styles.eventDot,
-                        { backgroundColor: noteColor?.accent ?? GlassTheme.accentPrimary },
-                      ]}
-                    />
-                    <View style={styles.eventInfo}>
-                      <Text style={styles.eventTitle} numberOfLines={1}>
-                        {note.title || 'Untitled'}
-                      </Text>
-                      <Text style={styles.eventMeta}>{formatTime(note.createdAt)}</Text>
-                    </View>
-                    <MaterialIcons name="chevron-right" size={18} color={GlassTheme.textTertiary} />
+                    <GlassCard accentColor={noteColor?.accent ?? GlassTheme.accentPrimary}>
+                      <View style={styles.eventCard}>
+                        <View
+                          style={[
+                            styles.eventDot,
+                            { backgroundColor: noteColor?.accent ?? GlassTheme.accentPrimary },
+                          ]}
+                        />
+                        <View style={styles.eventInfo}>
+                          <Text style={styles.eventTitle} numberOfLines={1}>
+                            {note.title || 'Untitled'}
+                          </Text>
+                          <Text style={styles.eventMeta}>{formatTime(note.createdAt)}</Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={18} color={GlassTheme.textTertiary} />
+                      </View>
+                    </GlassCard>
                   </Pressable>
                 );
               })}
@@ -180,30 +179,34 @@ export default function CalendarScreen() {
                 <Text style={[styles.eventGroupTitle, { color: '#F59E0B' }]}>Tasks Due</Text>
               </View>
               {selectedDayTodos.map((todo) => (
-                <View key={todo.id} style={styles.eventCard}>
-                  <View
-                    style={[
-                      styles.eventDot,
-                      { backgroundColor: todo.completed ? '#22C55E' : '#F59E0B' },
-                    ]}
-                  />
-                  <View style={styles.eventInfo}>
-                    <Text
-                      style={[
-                        styles.eventTitle,
-                        todo.completed && styles.eventTitleDone,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {todo.title || 'Untitled task'}
-                    </Text>
-                    <Text style={styles.eventMeta}>
-                      {todo.completed ? 'Completed' : todo.priority + ' priority'}
-                    </Text>
-                  </View>
-                  {todo.completed && (
-                    <MaterialIcons name="check-circle" size={18} color="#22C55E" />
-                  )}
+                <View key={todo.id}>
+                  <GlassCard accentColor={todo.completed ? '#22C55E' : '#F59E0B'}>
+                    <View style={styles.eventCard}>
+                      <View
+                        style={[
+                          styles.eventDot,
+                          { backgroundColor: todo.completed ? '#22C55E' : '#F59E0B' },
+                        ]}
+                      />
+                      <View style={styles.eventInfo}>
+                        <Text
+                          style={[
+                            styles.eventTitle,
+                            todo.completed && styles.eventTitleDone,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {todo.title || 'Untitled task'}
+                        </Text>
+                        <Text style={styles.eventMeta}>
+                          {todo.completed ? 'Completed' : todo.priority + ' priority'}
+                        </Text>
+                      </View>
+                      {todo.completed && (
+                        <MaterialIcons name="check-circle" size={18} color="#22C55E" />
+                      )}
+                    </View>
+                  </GlassCard>
                 </View>
               ))}
             </View>
@@ -217,14 +220,7 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: GlassTheme.backgroundPrimary,
-  },
-  gradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 200,
+    backgroundColor: '#000000',
   },
   header: {
     paddingHorizontal: GlassTheme.spacing.lg,
@@ -284,11 +280,6 @@ const styles = StyleSheet.create({
   eventCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: GlassTheme.glassBackground,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
-    borderRadius: GlassTheme.radius.md,
-    padding: GlassTheme.spacing.md,
     gap: 12,
   },
   eventDot: {

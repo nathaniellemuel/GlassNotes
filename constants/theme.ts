@@ -1,8 +1,8 @@
 export const GlassTheme = {
   // Backgrounds
-  backgroundPrimary: '#050505',
-  backgroundSecondary: '#0a0a0a',
-  backgroundElevated: '#111111',
+  backgroundPrimary: '#000000',
+  backgroundSecondary: '#050505',
+  backgroundElevated: '#0a0a0a',
 
   // Glass effect
   glassBackground: 'rgba(255, 255, 255, 0.05)',
@@ -40,11 +40,11 @@ export const GlassTheme = {
 
   // Border radius
   radius: {
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 20,
-    xxl: 24,
+    sm: 10,
+    md: 14,
+    lg: 20,
+    xl: 28,
+    xxl: 36,
     full: 9999,
   },
 
@@ -89,6 +89,40 @@ export const AccentThemePresets: Record<
     accentGradient: ['#F59E0B', '#D97706'],
   },
 };
+
+export type BackgroundThemeId = 'black' | 'slate' | 'navy' | 'midnight';
+
+export const BackgroundThemePresets: Record<BackgroundThemeId, { backgroundPrimary: string; backgroundSecondary: string; backgroundElevated: string }> = {
+  black: {
+    backgroundPrimary: '#000000',
+    backgroundSecondary: '#050505',
+    backgroundElevated: '#0a0a0a',
+  },
+  slate: {
+    backgroundPrimary: '#0F172A', // Slate 900
+    backgroundSecondary: '#0B1120',
+    backgroundElevated: '#1E293B', // Slate 800
+  },
+  navy: {
+    backgroundPrimary: '#0A1128',
+    backgroundSecondary: '#050814',
+    backgroundElevated: '#151E3D',
+  },
+  midnight: {
+    backgroundPrimary: '#1E1B4B', // Indigo 950
+    backgroundSecondary: '#13112E',
+    backgroundElevated: '#312E81', // Indigo 900
+  }
+};
+
+export function applyBackgroundTheme(themeId: BackgroundThemeId) {
+  const preset = BackgroundThemePresets[themeId];
+  if (preset) {
+    GlassTheme.backgroundPrimary = preset.backgroundPrimary;
+    GlassTheme.backgroundSecondary = preset.backgroundSecondary;
+    GlassTheme.backgroundElevated = preset.backgroundElevated;
+  }
+}
 
 export function applyAccentTheme(themeId: AccentThemeId) {
   const preset = AccentThemePresets[themeId];
