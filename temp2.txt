@@ -28,9 +28,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { GlassTheme } from '@/constants/theme';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
-import { generateId } from '@/utils/id';
 import { useNotes } from '@/hooks/use-notes';
 import { useFolders } from '@/hooks/use-folders';
 import { SearchBar } from '@/components/search-bar';
@@ -81,13 +78,11 @@ export default function NotesListScreen() {
     togglePin,
     moveToFolder,
     loadNotes,
-    saveNote,
   } = useNotes();
   const { folders, loadFolders, createFolder, renameFolder, deleteFolder, moveFolder } = useFolders();
 
   const [currentFolderId, setCurrentFolderId] = useState<string | undefined>(undefined);
   const [showFolderModal, setShowFolderModal] = useState(false);
-  const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [itemMenu, setItemMenu] = useState<
@@ -338,35 +333,6 @@ export default function NotesListScreen() {
     }, 150);
   };
 
-  const handleUploadPhoto = async () => {
-    setShowUploadSheet(false);
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
-    if (!result.canceled && result.assets[0]) {
-      const newFile = { id: generateId(), title: result.assets[0].fileName || 'Uploaded Photo', content: '', checklist: [], colorId: 'default' as any, folderId: currentFolderId, createdAt: Date.now(), updatedAt: Date.now(), isPinned: false, type: 'image' as const, fileUri: result.assets[0].uri };
-      await saveNote(newFile);
-    }
-  };
-
-  const handleUploadVideo = async () => {
-    setShowUploadSheet(false);
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], quality: 0.8 });
-    if (!result.canceled && result.assets[0]) {
-      const newFile = { id: generateId(), title: result.assets[0].fileName || 'Uploaded Video', content: '', checklist: [], colorId: 'default' as any, folderId: currentFolderId, createdAt: Date.now(), updatedAt: Date.now(), isPinned: false, type: 'video' as const, fileUri: result.assets[0].uri };
-      await saveNote(newFile);
-    }
-  };
-
-  const handleUploadPDF = async () => {
-    setShowUploadSheet(false);
-    try {
-      const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true });
-      if (!result.canceled && result.assets.length > 0) {
-        const newFile = { id: generateId(), title: result.assets[0].name || 'Uploaded PDF', content: '', checklist: [], colorId: 'default' as any, folderId: currentFolderId, createdAt: Date.now(), updatedAt: Date.now(), isPinned: false, type: 'pdf' as const, fileUri: result.assets[0].uri };
-        await saveNote(newFile);
-      }
-    } catch (e) { console.warn(e); }
-  };
-
   const handleNotePress = (id: string) => {
     router.push({ pathname: '/editor', params: { id } });
   };
@@ -595,7 +561,7 @@ export default function NotesListScreen() {
                   draggingItem?.type === 'folder' &&
                   draggingItem.folder.id === item.folder.id &&
                   styles.explorerRowDragging,
-                  draggingItem?.overFolderId === item.folder.id && [styles.explorerRowDropTarget, { backgroundColor: GlassTheme.accentPrimary + '2E', borderColor: GlassTheme.accentPrimary + 'B3' }],
+                  draggingItem?.overFolderId === item.folder.id && styles.explorerRowDropTarget,
                 ]}
                 onLayout={(event) => {
                   folderLayouts.set(item.folder.id, event.nativeEvent.layout);
@@ -711,32 +677,6 @@ export default function NotesListScreen() {
                 <Text style={[styles.modalSaveText, { color: GlassTheme.accentText }]}>{editingFolderId ? 'Rename' : 'Create'}</Text>
               </Pressable>
             </View>
-          </View>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={showUploadSheet} transparent animationType="fade">
-        <Pressable style={[styles.modalOverlay, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]} onPress={() => setShowUploadSheet(false)}>
-          <View style={[styles.actionSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
-            <Text style={styles.actionSheetTitle}>Upload File</Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Pressable style={styles.actionSheetButton} onPress={handleUploadPhoto}>
-                <MaterialIcons name="image" size={16} color={GlassTheme.textSecondary} />
-                <Text style={styles.actionSheetText}>Upload Photo</Text>
-              </Pressable>
-              <Pressable style={styles.actionSheetButton} onPress={handleUploadVideo}>
-                <MaterialIcons name="movie" size={16} color={GlassTheme.textSecondary} />
-                <Text style={styles.actionSheetText}>Upload Video</Text>
-              </Pressable>
-              <Pressable style={styles.actionSheetButton} onPress={handleUploadPDF}>
-                <MaterialIcons name="picture-as-pdf" size={16} color={GlassTheme.textSecondary} />
-                <Text style={styles.actionSheetText}>Upload PDF</Text>
-              </Pressable>
-              <Pressable style={[styles.actionSheetButton, { marginTop: 8 }]} onPress={() => setShowUploadSheet(false)}>
-                <MaterialIcons name="close" size={16} color={GlassTheme.textSecondary} />
-                <Text style={styles.actionSheetText}>Cancel</Text>
-              </Pressable>
-            </ScrollView>
           </View>
         </Pressable>
       </Modal>
@@ -1181,9 +1121,4 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
-
-
-
-
 

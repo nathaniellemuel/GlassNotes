@@ -11,6 +11,7 @@ import {
   Platform,
   Keyboard,
   Modal,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -38,6 +39,8 @@ export default function EditorScreen() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [images, setImages] = useState<string[]>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [colorId, setColorId] = useState<NoteColorId>('default');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [noteId] = useState(() => id ?? generateId());
@@ -53,6 +56,7 @@ export default function EditorScreen() {
   const debouncedTitle = useDebounce(title, 500);
   const debouncedContent = useDebounce(content, 500);
   const debouncedChecklist = useDebounce(checklist, 500);
+  const debouncedImages = useDebounce(images, 500);
 
   useEffect(() => {
     if (id) {
@@ -61,6 +65,7 @@ export default function EditorScreen() {
         setTitle(existing.title);
         setContent(existing.content);
         setChecklist(existing.checklist ?? []);
+        setImages(existing.images ?? []);
         setColorId(existing.colorId ?? 'default');
         setReminderAt(existing.reminderAt);
       }
@@ -70,13 +75,14 @@ export default function EditorScreen() {
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (!debouncedTitle && !debouncedContent && debouncedChecklist.length === 0) return;
+    if (!debouncedTitle && !debouncedContent && debouncedChecklist.length === 0 && debouncedImages.length === 0) return;
 
     const note: Note = {
       id: noteId,
       title: debouncedTitle,
       content: debouncedContent,
       checklist: debouncedChecklist,
+      images: debouncedImages,
       colorId,
       folderId: id ? (getNote(id)?.folderId) : (paramFolderId || undefined),
       reminderAt,
@@ -85,7 +91,7 @@ export default function EditorScreen() {
       isPinned: id ? (getNote(id)?.isPinned ?? false) : false,
     };
     saveNote(note);
-  }, [debouncedTitle, debouncedContent, debouncedChecklist, colorId, reminderAt, isLoaded]);
+  }, [debouncedTitle, debouncedContent, debouncedChecklist, debouncedImages, colorId, reminderAt, isLoaded]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
@@ -210,23 +216,9 @@ export default function EditorScreen() {
     if (result.canceled || result.assets.length === 0) return;
 
     const image = result.assets[0];
-    const imageMarkdown = `![${image.fileName ?? 'photo'}](${image.uri})`;
-    const sel = selectionRef.current;
-    const before = content.slice(0, sel.start);
-    const after = content.slice(sel.end);
-    const spacerBefore = before && !before.endsWith('\n') ? '\n' : '';
-    const spacerAfter = after && !after.startsWith('\n') ? '\n' : '';
-    const insertion = `${spacerBefore}${imageMarkdown}${spacerAfter}`;
-    const newText = before + insertion + after;
-    const caretPos = before.length + spacerBefore.length + imageMarkdown.length;
-    const newSelection = { start: caretPos, end: caretPos };
-
-    setContent(newText);
-    selectionRef.current = newSelection;
-    setSelection(newSelection);
+    setImages(prev => [...prev, image.uri]);
     Alert.alert('Image Inserted', image.fileName ?? 'Photo added to note.');
-    contentRef.current?.focus();
-  }, [content]);
+  }, []);
 
   const handleLaunchGallery = useCallback(async () => {
     setShowPhotoSourceSheet(false);
@@ -264,7 +256,14 @@ export default function EditorScreen() {
     setShowPhotoSourceSheet(true);
   }, []);
 
+  const handleRemoveImage = useCallback((index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
   const noteColor = NOTE_COLORS.find((c) => c.id === colorId) ?? NOTE_COLORS[0];
+  const isDefaultColor = noteColor.id === 'default';
+  const activeAccent = isDefaultColor ? GlassTheme.accentPrimary : noteColor.accent;
+
   const wordCount = stripFormatting(content).trim().split(/\s+/).filter(Boolean).length;
   const charCount = content.length;
   const isKeyboardOpen = keyboardHeight > 0;
@@ -315,7 +314,7 @@ export default function EditorScreen() {
             style={styles.headerButton}
             hitSlop={8}
           >
-            <View style={[styles.colorDot, { backgroundColor: noteColor.accent }]} />
+            <View style={[styles.colorDot, { backgroundColor: activeAccent }]} />
           </Pressable>
 
           {(id || title || content || checklist.length > 0) && (
@@ -352,6 +351,19 @@ export default function EditorScreen() {
           />
 
           <View style={styles.divider} />
+
+          {images.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageGallery}>
+              {images.map((img, i) => (
+                <Pressable key={i} onPress={() => setPreviewImage(img)} style={styles.imageCard}>
+                  <Image source={{ uri: img }} style={styles.imageThumb} />
+                  <Pressable onPress={() => handleRemoveImage(i)} style={styles.removeImageBtn}>
+                    <MaterialIcons name="close" size={16} color="#FFF" />
+                  </Pressable>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
 
           <TextInput
             ref={contentRef}
@@ -459,6 +471,18 @@ export default function EditorScreen() {
             </View>
           </Pressable>
         </Modal>
+
+        {previewImage !== null && (
+          <Modal visible={true} transparent={true} animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+            <View style={styles.previewContainer}>
+              <Pressable onPress={() => setPreviewImage(null)} style={styles.previewBackdrop} />
+              <Image source={{ uri: previewImage }} style={styles.previewImage} resizeMode="contain" />
+              <Pressable onPress={() => setPreviewImage(null)} style={styles.previewCloseBtn}>
+                <MaterialIcons name="close" size={24} color="#FFF" />
+              </Pressable>
+            </View>
+          </Modal>
+        )}
       </KeyboardAvoidingView>
     );
 }
@@ -595,6 +619,65 @@ const styles = StyleSheet.create({
     color: GlassTheme.textSecondary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  imageGallery: {
+    maxHeight: 120,
+    marginBottom: GlassTheme.spacing.md,
+  },
+  imageCard: {
+    width: 100,
+    height: 100,
+    borderRadius: GlassTheme.radius.xl,
+    marginRight: GlassTheme.spacing.sm,
+    backgroundColor: GlassTheme.glassBackground,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+    overflow: 'hidden',
+    position: 'relative',
+    ...GlassTheme.shadowPrimary,
+  },
+  imageThumb: {
+    width: '100%',
+    height: '100%',
+    borderRadius: GlassTheme.radius.xl,
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  previewContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+  },
+  previewImage: {
+    width: '100%',
+    height: '80%',
+  },
+  previewCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

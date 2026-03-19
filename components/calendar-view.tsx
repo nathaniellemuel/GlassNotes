@@ -114,8 +114,9 @@ export function CalendarView({ selectedDate, onSelectDate, getEventsForDate }: P
                 <Text
                   style={[
                     styles.dayText,
+                    isSelected && { fontWeight: '700', color: GlassTheme.textPrimary },
                     isToday && styles.todayText,
-                    isSelected && { color: GlassTheme.textPrimary, fontWeight: '700' },
+                    isToday && { color: GlassTheme.accentText },
                   ]}
                 >
                   {date.getDate()}
@@ -124,7 +125,7 @@ export function CalendarView({ selectedDate, onSelectDate, getEventsForDate }: P
               {hasEvents && (
                 <View style={styles.dotRow}>
                   {hasNote && <View style={[styles.dot, { backgroundColor: GlassTheme.accentPrimary }]} />}
-                  {hasTodo && <View style={[styles.dot, { backgroundColor: '#F59E0B' }]} />}
+                  {hasTodo && <View style={[styles.dot, { backgroundColor: GlassTheme.warning || '#F59E0B' }]} />}
                   {hasTodoDone && <View style={[styles.dot, { backgroundColor: '#22C55E' }]} />}
                 </View>
               )}

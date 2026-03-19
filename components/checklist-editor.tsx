@@ -82,7 +82,7 @@ export function ChecklistEditor({ items, onChange }: ChecklistEditorProps) {
 
       <Pressable onPress={addItem} style={styles.addButton}>
         <MaterialIcons name="add" size={18} color={GlassTheme.accentPrimary} />
-        <Text style={styles.addText}>Add item</Text>
+        <Text style={[styles.addText, { color: GlassTheme.accentPrimary }]}>Add item</Text>
       </Pressable>
     </View>
   );

@@ -20,6 +20,7 @@ export const GlassTheme = {
   accentPrimary: '#8B5CF6',
   accentSecondary: '#6366F1',
   accentGradient: ['#8B5CF6', '#6366F1'] as const,
+  accentText: '#FFFFFF',
 
   // Semantic
   destructive: '#EF4444',
@@ -66,27 +67,31 @@ export type AccentThemeId = 'default' | 'white' | 'red' | 'gold';
 
 export const AccentThemePresets: Record<
   AccentThemeId,
-  { accentPrimary: string; accentSecondary: string; accentGradient: readonly [string, string] }
+  { accentPrimary: string; accentSecondary: string; accentGradient: readonly [string, string]; accentText: string }
 > = {
   default: {
     accentPrimary: '#8B5CF6',
     accentSecondary: '#6366F1',
     accentGradient: ['#8B5CF6', '#6366F1'],
+    accentText: '#FFFFFF',
   },
   white: {
     accentPrimary: '#E5E7EB',
     accentSecondary: '#CBD5E1',
     accentGradient: ['#E5E7EB', '#CBD5E1'],
+    accentText: '#000000',
   },
   red: {
     accentPrimary: '#EF4444',
     accentSecondary: '#B91C1C',
     accentGradient: ['#EF4444', '#B91C1C'],
+    accentText: '#FFFFFF',
   },
   gold: {
     accentPrimary: '#F59E0B',
     accentSecondary: '#D97706',
     accentGradient: ['#F59E0B', '#D97706'],
+    accentText: '#FFFFFF',
   },
 };
 
@@ -128,6 +133,7 @@ export function applyAccentTheme(themeId: AccentThemeId) {
   const preset = AccentThemePresets[themeId];
   GlassTheme.accentPrimary = preset.accentPrimary;
   GlassTheme.accentSecondary = preset.accentSecondary;
-  GlassTheme.accentGradient = preset.accentGradient;
+  GlassTheme.accentGradient = preset.accentGradient as any;
+  GlassTheme.accentText = preset.accentText;
   GlassTheme.shadowPrimary.shadowColor = preset.accentPrimary;
 }

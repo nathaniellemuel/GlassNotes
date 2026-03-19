@@ -60,8 +60,6 @@ export default function CalendarScreen() {
             color: isDefaultColor ? GlassTheme.accentPrimary : noteColor.accent,
           });
         }
-      });
-
       todos.forEach((t) => {
         if (t.dueDate && isSameDay(new Date(t.dueDate), date)) {
           events.push({

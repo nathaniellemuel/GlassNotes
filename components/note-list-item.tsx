@@ -110,7 +110,16 @@ export function NoteListItem({
             </View>
 
             <View style={styles.centerContent}>
-              <MaterialIcons name="description" size={48} color="rgba(255, 255, 255, 0.15)" />
+              <MaterialIcons 
+                name={
+                  note.type === 'pdf' ? 'picture-as-pdf' :
+                  note.type === 'image' ? 'image' :
+                  note.type === 'video' ? 'movie' :
+                  'description'
+                } 
+                size={48} 
+                color="rgba(255, 255, 255, 0.15)" 
+              />
             </View>
           </View>
         </GlassCard>

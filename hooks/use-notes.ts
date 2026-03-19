@@ -24,6 +24,9 @@ export function useNotes() {
       ...n,
       checklist: n.checklist ?? [],
       colorId: n.colorId ?? 'default',
+      images: n.images ?? [],
+      type: n.type ?? 'note',
+      fileUri: n.fileUri,
     })) as Note[];
     setNotes(migrated);
     setIsLoading(false);

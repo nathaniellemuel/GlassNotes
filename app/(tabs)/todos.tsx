@@ -152,9 +152,15 @@ export default function TodosScreen() {
           <Pressable
             key={tab.key}
             onPress={() => setFilter(tab.key)}
-            style={[styles.filterTab, filter === tab.key && styles.filterTabActive]}
+            style={[
+              styles.filterTab, 
+              filter === tab.key && { backgroundColor: GlassTheme.accentPrimary + '20', borderColor: GlassTheme.accentPrimary + '60' }
+            ]}
           >
-            <Text style={[styles.filterLabel, filter === tab.key && styles.filterLabelActive]}>
+            <Text style={[
+              styles.filterLabel, 
+              filter === tab.key && { color: GlassTheme.accentPrimary }
+            ]}>
               {tab.label}
             </Text>
           </Pressable>
@@ -207,7 +213,7 @@ export default function TodosScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <MaterialIcons name="add" size={24} color="#FFFFFF" />
+          <MaterialIcons name="add" size={24} color={GlassTheme.accentText} />
         </LinearGradient>
       </Pressable>
 
@@ -381,17 +387,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
   },
-  filterTabActive: {
-    backgroundColor: '#F59E0B20',
-    borderColor: '#F59E0B60',
-  },
   filterLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: GlassTheme.textTertiary,
-  },
-  filterLabelActive: {
-    color: '#F59E0B',
   },
   listContent: {
     paddingBottom: 160,

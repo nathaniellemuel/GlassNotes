@@ -28,9 +28,12 @@ export interface Note {
   isPinned: boolean;
   reminderAt?: number;
   notificationId?: string;
+  images?: string[];
+  type?: 'note' | 'pdf' | 'image' | 'video';
+  fileUri?: string;
 }
 
-export type NotePreview = Pick<Note, 'id' | 'title' | 'updatedAt' | 'isPinned' | 'colorId' | 'folderId'> & {
+export type NotePreview = Pick<Note, 'id' | 'title' | 'updatedAt' | 'isPinned' | 'colorId' | 'folderId' | 'type' | 'fileUri'> & {
   preview: string;
   checklistTotal: number;
   checklistDone: number;

@@ -109,7 +109,7 @@ export function TodoItem({ todo, index, onToggle, onPress, onLongPress, onDelete
                   <Text
                     style={[
                       styles.metaText,
-                      isOverdue && { color: GlassTheme.destructive },
+                      isOverdue ? { color: GlassTheme.destructive } : undefined,
                     ]}
                   >
                     {formatDate(todo.dueDate)}
