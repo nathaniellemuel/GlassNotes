@@ -378,8 +378,8 @@ export default function NotesListScreen() {
         <View style={styles.directoryRow}>
           <View style={styles.directoryInfo}>
             <MaterialIcons name="folder-open" size={24} color={GlassTheme.accentPrimary} />
-            <View>
-              <Text style={styles.directoryPath} numberOfLines={1}>
+            <View style={styles.directoryTextWrap}>
+              <Text style={styles.directoryPath} numberOfLines={1} ellipsizeMode="middle">
                 {currentPathLabel}
               </Text>
               <Text style={styles.directoryStats}>
@@ -744,9 +744,9 @@ export default function NotesListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
   topActionsContainer: {
-    paddingHorizontal: GlassTheme.spacing.md,
     marginTop: GlassTheme.spacing.md,
     marginBottom: GlassTheme.spacing.sm,
+    // SearchBar already has marginHorizontal
   },
   drivePanel: {
     marginHorizontal: GlassTheme.spacing.md,
@@ -757,7 +757,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 15, 15, 0.8)', // extremely dark pill 
     paddingVertical: GlassTheme.spacing.md,
     paddingHorizontal: GlassTheme.spacing.sm,
-    flexDirection: 'row', // to align the whole bar directly
   },
   directoryRow: {
     paddingHorizontal: GlassTheme.spacing.sm,
@@ -771,6 +770,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginRight: 8,
+    minWidth: 0,
+  },
+  directoryTextWrap: {
+    flex: 1,
     minWidth: 0,
   },
   directoryPath: {
@@ -788,6 +792,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
   },
   directoryActionButton: {
     width: 44,

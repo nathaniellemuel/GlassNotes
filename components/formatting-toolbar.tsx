@@ -86,7 +86,7 @@ export function FormattingToolbar({
 const styles = StyleSheet.create({
   container: {
     marginHorizontal: GlassTheme.spacing.md,
-    marginBottom: GlassTheme.spacing.sm,
+    marginBottom: GlassTheme.spacing.md, // Increased from sm to md for better breathing room
   },
   inner: {
     flexDirection: 'row',

@@ -35,12 +35,13 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: GlassTheme.spacing.md,
     marginBottom: GlassTheme.spacing.md,
+    height: 48,
   },
   inner: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: GlassTheme.spacing.md,
-    paddingVertical: GlassTheme.spacing.sm + 2,
     gap: GlassTheme.spacing.sm,
   },
   input: {

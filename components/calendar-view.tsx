@@ -103,15 +103,19 @@ export function CalendarView({ selectedDate, onSelectDate, getEventsForDate }: P
               <View
                 style={[
                   styles.dayCircle,
-                  isToday && styles.todayCircle,
-                  isSelected && !isToday && styles.selectedCircle,
+                  isToday && { backgroundColor: GlassTheme.accentPrimary },
+                  isSelected && !isToday && { 
+                    backgroundColor: GlassTheme.glassBorderFocused,
+                    borderWidth: 1.5,
+                    borderColor: GlassTheme.accentPrimary 
+                  },
                 ]}
               >
                 <Text
                   style={[
                     styles.dayText,
                     isToday && styles.todayText,
-                    isSelected && styles.selectedText,
+                    isSelected && { color: GlassTheme.textPrimary, fontWeight: '700' },
                   ]}
                 >
                   {date.getDate()}
@@ -131,8 +135,17 @@ export function CalendarView({ selectedDate, onSelectDate, getEventsForDate }: P
 
       {/* Today button */}
       {!isSameDay(selectedDate, today) && (
-        <Pressable onPress={() => onSelectDate(new Date())} style={styles.todayBtn}>
-          <Text style={styles.todayBtnText}>Today</Text>
+        <Pressable 
+          onPress={() => onSelectDate(new Date())} 
+          style={[
+            styles.todayBtn,
+            {
+              backgroundColor: GlassTheme.accentPrimary + '20',
+              borderColor: GlassTheme.accentPrimary + '40',
+            }
+          ]}
+        >
+          <Text style={[styles.todayBtnText, { color: GlassTheme.accentPrimary }]}>Today</Text>
         </Pressable>
       )}
       </View>
@@ -198,14 +211,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  todayCircle: {
-    backgroundColor: GlassTheme.accentPrimary,
-  },
-  selectedCircle: {
-    backgroundColor: GlassTheme.glassBorderFocused,
-    borderWidth: 1.5,
-    borderColor: GlassTheme.accentPrimary,
-  },
   dayText: {
     fontSize: 13,
     fontWeight: '500',
@@ -235,13 +240,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: GlassTheme.spacing.md,
     paddingVertical: GlassTheme.spacing.xs,
     borderRadius: GlassTheme.radius.full,
-    backgroundColor: GlassTheme.accentPrimary + '20',
     borderWidth: 1,
-    borderColor: GlassTheme.accentPrimary + '40',
   },
   todayBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: GlassTheme.accentPrimary,
   },
 });

@@ -242,8 +242,12 @@ export default function EditorScreen() {
   const noteColor = NOTE_COLORS.find((c) => c.id === colorId) ?? NOTE_COLORS[0];
   const wordCount = stripFormatting(content).trim().split(/\s+/).filter(Boolean).length;
   const charCount = content.length;
+  const isKeyboardOpen = keyboardHeight > 0;
+  
+  // Extra space when keyboard is open to prevent sticking to prediction bars
+  const extraPadding = isKeyboardOpen ? 16 : 0;
   const toolbarOffset = Math.max(0, keyboardHeight - insets.bottom);
-  const toolbarPaddingBottom = Math.max(insets.bottom, GlassTheme.spacing.md);
+  const toolbarPaddingBottom = Math.max(insets.bottom, GlassTheme.spacing.md) + extraPadding;
 
   return (
     <KeyboardAvoidingView
