@@ -23,6 +23,7 @@ type NoteListItemProps = {
   onMenuPress?: () => void;
   onItemTouchMove?: (event: any) => void;
   onItemTouchEnd?: (event: any) => void;
+  isDragging?: boolean;
 };
 
 function formatDate(timestamp: number): string {
@@ -52,6 +53,7 @@ export function NoteListItem({
   onMenuPress,
   onItemTouchMove,
   onItemTouchEnd,
+  isDragging,
 }: NoteListItemProps) {
   const scale = useSharedValue(1);
 
@@ -63,9 +65,8 @@ export function NoteListItem({
     scale.value = withSpring(0.96, { damping: 15, stiffness: 400 });
   };
 
-  const handlePressOut = (event: any) => {
+  const handlePressOut = () => {
     scale.value = withSpring(1, { damping: 12, stiffness: 200 });
-    onItemTouchEnd?.(event);
   };
 
   const handleLongPress = (event: any) => {
@@ -85,7 +86,7 @@ export function NoteListItem({
         onLongPress={handleLongPress}
         onTouchMove={onItemTouchMove}
         onTouchEnd={onItemTouchEnd}
-        style={[styles.wrapper, animatedStyle]}
+        style={[styles.wrapper, animatedStyle, isDragging && { opacity: 0.35 }]}
       >
         <GlassCard accentColor={note.colorId !== 'default' ? noteColor.accent : undefined} style={{ borderRadius: GlassTheme.radius.xxl }}>
           <View style={styles.innerContainer}>

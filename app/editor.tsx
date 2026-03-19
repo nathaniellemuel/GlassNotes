@@ -46,6 +46,7 @@ export default function EditorScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [showReminderSheet, setShowReminderSheet] = useState(false);
+  const [showPhotoSourceSheet, setShowPhotoSourceSheet] = useState(false);
 
   const contentRef = useRef<TextInput>(null);
   const selectionRef = useRef(selection);
@@ -205,19 +206,7 @@ export default function EditorScreen() {
     contentRef.current?.focus();
   }, [content]);
 
-  const handleInsertPhoto = useCallback(async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    const hasAccess = permission.granted || permission.accessPrivileges === 'limited';
-    if (!hasAccess) {
-      Alert.alert('Permission Required', 'Allow photo access to insert images into your note.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.9,
-    });
-
+  const processImageResult = useCallback((result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || result.assets.length === 0) return;
 
     const image = result.assets[0];
@@ -238,6 +227,42 @@ export default function EditorScreen() {
     Alert.alert('Image Inserted', image.fileName ?? 'Photo added to note.');
     contentRef.current?.focus();
   }, [content]);
+
+  const handleLaunchGallery = useCallback(async () => {
+    setShowPhotoSourceSheet(false);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const hasAccess = permission.granted || permission.accessPrivileges === 'limited';
+    if (!hasAccess) {
+      Alert.alert('Permission Required', 'Allow photo access to insert images into your note.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.9,
+    });
+    processImageResult(result);
+  }, [processImageResult]);
+
+  const handleLaunchCamera = useCallback(async () => {
+    setShowPhotoSourceSheet(false);
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission Required', 'Allow camera access to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.9,
+    });
+    processImageResult(result);
+  }, [processImageResult]);
+
+  const handleInsertPhoto = useCallback(() => {
+    Keyboard.dismiss();
+    setShowPhotoSourceSheet(true);
+  }, []);
 
   const noteColor = NOTE_COLORS.find((c) => c.id === colorId) ?? NOTE_COLORS[0];
   const wordCount = stripFormatting(content).trim().split(/\s+/).filter(Boolean).length;
@@ -405,8 +430,37 @@ export default function EditorScreen() {
           </View>
         </Pressable>
       </Modal>
-    </KeyboardAvoidingView>
-  );
+
+        <Modal visible={showPhotoSourceSheet} transparent animationType="fade">
+          <Pressable
+            style={[
+              styles.modalOverlay,
+              { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+            ]}
+            onPress={() => setShowPhotoSourceSheet(false)}
+          >
+            <View style={[styles.reminderSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
+              <Text style={styles.reminderTitle}>Insert Photo</Text>
+              <Text style={styles.reminderSubtitle}>Choose a source to add an image</Text>
+
+              <Pressable style={styles.reminderOption} onPress={handleLaunchCamera}>
+                <MaterialIcons name="photo-camera" size={16} color={GlassTheme.textSecondary} />
+                <Text style={styles.reminderOptionText}>Take a Photo</Text>
+              </Pressable>
+
+              <Pressable style={styles.reminderOption} onPress={handleLaunchGallery}>
+                <MaterialIcons name="photo-library" size={16} color={GlassTheme.textSecondary} />
+                <Text style={styles.reminderOptionText}>Choose from Gallery</Text>
+              </Pressable>
+
+              <Pressable style={styles.reminderCancel} onPress={() => setShowPhotoSourceSheet(false)}>
+                <Text style={styles.reminderCancelText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
+      </KeyboardAvoidingView>
+    );
 }
 
 const styles = StyleSheet.create({
@@ -543,3 +597,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+

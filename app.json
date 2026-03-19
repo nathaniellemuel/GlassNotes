@@ -47,7 +47,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow GlassNotes to access your photos so you can insert images into notes."
+          "photosPermission": "Allow GlassNotes to access your photos so you can insert images into notes.",
+          "cameraPermission": "Allow GlassNotes to access your camera to take photos for your notes."
         }
       ]
     ],

@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -89,6 +90,12 @@ export default function NotesListScreen() {
     | { type: 'folder'; folder: Folder }
     | null
   >(null);
+  const [pendingMoveItem, setPendingMoveItem] = useState<{
+    type: 'note' | 'folder';
+    note?: NotePreview;
+    folder?: Folder;
+  } | null>(null);
+
   const [confirmDelete, setConfirmDelete] = useState<
     | { type: 'note'; note: NotePreview }
     | { type: 'folder'; folder: Folder; noteMoveParentId?: string }
@@ -208,6 +215,52 @@ export default function NotesListScreen() {
     [folderMap],
   );
 
+  const folderTreeItems = useMemo(() => {
+    const list: { id: string | undefined; name: string; level: number; disabled: boolean }[] = [];
+    
+    // Determine the source ID to prevent moving to self, parent, or descendant
+    const movingFolderId = pendingMoveItem?.type === 'folder' ? pendingMoveItem.folder?.id : null;
+    const movingNoteParentId = pendingMoveItem?.type === 'note' ? pendingMoveItem.note?.folderId : null;
+    
+    // Add Root
+    list.push({ 
+      id: undefined, 
+      name: ROOT_NAME, 
+      level: 0,
+      disabled: (pendingMoveItem?.type === 'folder' && pendingMoveItem.folder?.parentId === undefined) || (pendingMoveItem?.type === 'note' && movingNoteParentId === undefined) 
+    });
+
+    const buildPath = (parentId: string | undefined, currentLevel: number) => {
+      const children = folders
+        .filter((f) => f.parentId === parentId)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      
+      for (const child of children) {
+        let isDisabled = false;
+        
+        if (pendingMoveItem?.type === 'folder') {
+          if (child.id === movingFolderId) isDisabled = true; // self
+          else if (child.id === pendingMoveItem.folder?.parentId) isDisabled = true; // already there
+          else if (movingFolderId && isFolderDescendant(child.id, movingFolderId)) isDisabled = true; // descendant
+        } else if (pendingMoveItem?.type === 'note') {
+          if (child.id === movingNoteParentId) isDisabled = true; // already there
+        }
+
+        list.push({ 
+          id: child.id, 
+          name: child.name, 
+          level: currentLevel,
+          disabled: isDisabled
+        });
+        
+        buildPath(child.id, currentLevel + 1);
+      }
+    };
+    
+    buildPath(undefined, 1);
+    return list;
+  }, [folders, pendingMoveItem, isFolderDescendant]);
+
   const resolveDropTarget = useCallback(
     (pageX: number, pageY: number): string | null => {
       // Memberikan toleransi drag coordinate (sepadan dengan offset di Android / hit slop)
@@ -246,7 +299,9 @@ export default function NotesListScreen() {
       if (prev.overFolderId == null) return null;
       const targetFolderId = prev.overFolderId;
       if (prev.type === 'note') {
-        moveToFolder(prev.note.id, targetFolderId);
+        if (prev.note.folderId !== targetFolderId) {
+          moveToFolder(prev.note.id, targetFolderId);
+        }
       } else {
         const invalidSelfTarget = targetFolderId === prev.folder.id;
         const invalidDescendantTarget = targetFolderId
@@ -314,6 +369,32 @@ export default function NotesListScreen() {
   const handleGoUp = () => {
     if (!currentFolderId) return;
     setCurrentFolderId(currentFolder?.parentId);
+  };
+
+  const handlePasteItem = () => {
+    if (!pendingMoveItem) return;
+    if (pendingMoveItem.type === 'note' && pendingMoveItem.note) {
+      // Validate that it's not already in this folder
+      if (pendingMoveItem.note.folderId !== currentFolderId) {
+        moveToFolder(pendingMoveItem.note.id, currentFolderId);
+      }
+    } else if (pendingMoveItem.type === 'folder' && pendingMoveItem.folder) {
+      const folderId = pendingMoveItem.folder.id;
+      // Cannot move folder into itself
+      if (folderId === currentFolderId) {
+        Alert.alert('Invalid Move', 'Cannot move a folder into itself.');
+        return;
+      }
+      // Cannot move folder into its own descendants
+      if (currentFolderId && isFolderDescendant(currentFolderId, folderId)) {
+        Alert.alert('Invalid Move', 'Cannot move a folder into its own subfolder.');
+        return;
+      }
+      if (pendingMoveItem.folder.parentId !== currentFolderId) {
+        moveFolder(folderId, currentFolderId);
+      }
+    }
+    setPendingMoveItem(null);
   };
 
   const handleConfirmDelete = () => {
@@ -388,6 +469,14 @@ export default function NotesListScreen() {
             </View>
           </View>
           <View style={styles.directoryActions}>
+            {pendingMoveItem ? (
+              <Pressable 
+                onPress={handlePasteItem} 
+                style={[styles.directoryActionButton, { backgroundColor: GlassTheme.accentPrimary + '40', borderColor: GlassTheme.accentPrimary }]}
+              >
+                <MaterialIcons name="content-paste" size={20} color={GlassTheme.accentPrimary} />
+              </Pressable>
+            ) : null}
             {currentFolderId ? (
               <Pressable onPress={handleGoUp} style={styles.directoryActionButton}>
                 <MaterialIcons name="arrow-upward" size={20} color={GlassTheme.textSecondary} />
@@ -524,6 +613,7 @@ export default function NotesListScreen() {
                     finishDrag();
                   }
                 }}
+                isDragging={draggingItem?.type === 'note' && draggingItem.note.id === item.note.id}
                 onMenuPress={() => setItemMenu({ type: 'note', note: item.note })}
               />
             )
@@ -634,12 +724,12 @@ export default function NotesListScreen() {
                 <Pressable
                   style={styles.actionSheetButton}
                   onPress={() => {
-                    moveToFolder(itemMenu.note.id, currentFolderId);
+                    setPendingMoveItem({ type: 'note', note: itemMenu.note });
                     setItemMenu(null);
                   }}
                 >
                   <MaterialIcons name="drive-file-move" size={16} color={GlassTheme.textSecondary} />
-                  <Text style={styles.actionSheetText}>Move to current folder</Text>
+                  <Text style={styles.actionSheetText}>Move to...</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.actionSheetButton, styles.actionSheetDanger]}
@@ -680,6 +770,16 @@ export default function NotesListScreen() {
                 >
                   <MaterialIcons name="open-with" size={16} color={GlassTheme.textSecondary} />
                   <Text style={styles.actionSheetText}>Start dragging</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionSheetButton}
+                  onPress={() => {
+                    setPendingMoveItem({ type: 'folder', folder: itemMenu.folder });
+                    setItemMenu(null);
+                  }}
+                >
+                  <MaterialIcons name="drive-file-move" size={16} color={GlassTheme.textSecondary} />
+                  <Text style={styles.actionSheetText}>Move to...</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.actionSheetButton, styles.actionSheetDanger]}
@@ -763,7 +863,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flex: 1,
   },
   directoryInfo: {
     flex: 1,

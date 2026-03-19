@@ -42,6 +42,7 @@ export default function TodosScreen() {
 
   const [showModal, setShowModal] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<Todo | null>(null);
 
   // Form state
   const [formTitle, setFormTitle] = useState('');
@@ -124,17 +125,7 @@ export default function TodosScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          Alert.alert('Delete Task', 'Are you sure?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete',
-              style: 'destructive',
-              onPress: () => {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                deleteTodo(todo.id);
-              },
-            },
-          ]);
+          setItemToDelete(todo);
         },
       },
       { text: 'Cancel', style: 'cancel' },
@@ -181,17 +172,7 @@ export default function TodosScreen() {
             onPress={() => openEditModal(item)}
             onLongPress={() => handleLongPress(item)}
             onDelete={() => {
-              Alert.alert('Delete Task', 'Are you sure you want to delete this task?', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete',
-                  style: 'destructive',
-                  onPress: () => {
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                    deleteTodo(item.id);
-                  },
-                },
-              ]);
+              setItemToDelete(item);
             }}
           />
         )}
@@ -326,6 +307,40 @@ export default function TodosScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal visible={!!itemToDelete} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setItemToDelete(null)} />
+          <View style={[styles.modalSheet, { maxHeight: 'auto', paddingBottom: insets.bottom + 24 }]}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Delete Task</Text>
+            <Text style={{ fontSize: 15, color: GlassTheme.textSecondary, marginBottom: 24, lineHeight: 22 }}>
+              Are you sure you want to delete
+              <Text style={{ fontWeight: 'bold', color: GlassTheme.textPrimary }}> "{itemToDelete?.title}"</Text>?
+              This action cannot be undone.
+            </Text>
+            
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setItemToDelete(null)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={styles.modalDanger}
+                onPress={() => {
+                  if (itemToDelete) {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                    deleteTodo(itemToDelete.id);
+                    setItemToDelete(null);
+                  }
+                }}
+              >
+                <Text style={styles.modalDangerText}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -523,5 +538,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  modalDanger: {
+    flex: 2,
+    paddingVertical: GlassTheme.spacing.md,
+    borderRadius: GlassTheme.radius.md,
+    borderWidth: 1.5,
+    borderColor: 'rgba(239,68,68,0.5)',
+    backgroundColor: 'rgba(239,68,68,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalDangerText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#EF4444',
   },
 });
