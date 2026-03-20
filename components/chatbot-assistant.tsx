@@ -136,7 +136,7 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
       console.log('[ChatBot] Text length:', text.length);
 
       const requestBody = {
-        model: 'arcee/arcee-fast',
+        model: 'arcee-ai/trinity-large-preview:free',
         messages: [
           {
             role: 'system',
