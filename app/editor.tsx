@@ -390,8 +390,14 @@ export default function EditorScreen() {
     setListType(type);
   }, []);
 
-  const handleAIEditorSave = useCallback((processedText: string) => {
-    setContent(processedText);
+  const handleAIUpdateNote = useCallback((text: string, action: 'append' | 'replace' | 'prepend') => {
+    if (action === 'replace') {
+      setContent(text);
+    } else if (action === 'append') {
+      setContent(prev => prev + '\n\n' + text);
+    } else if (action === 'prepend') {
+      setContent(prev => text + '\n\n' + prev);
+    }
   }, []);
 
   const handleRotateImage = useCallback(async (index: number) => {
@@ -806,8 +812,8 @@ export default function EditorScreen() {
         {showAIEditor && (
           <Modal visible={true} transparent={false} animationType="slide">
             <ChatBotAssistant
-              initialText={content}
-              onSaveToNote={handleAIEditorSave}
+              currentNoteContent={content}
+              onUpdateNote={handleAIUpdateNote}
               onClose={() => setShowAIEditor(false)}
             />
           </Modal>

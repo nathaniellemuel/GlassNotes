@@ -22,12 +22,14 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  isTyping?: boolean;
+  displayedContent?: string;
 }
 
 interface ChatBotProps {
   onClose?: () => void;
-  onSaveToNote?: (text: string) => void;
-  initialText?: string;
+  onUpdateNote?: (text: string, action: 'append' | 'replace' | 'prepend') => void;
+  currentNoteContent?: string;
 }
 
 const SUGGESTION_ACTIONS = [
@@ -37,40 +39,36 @@ const SUGGESTION_ACTIONS = [
   { id: 'improve', label: 'Improve', icon: 'auto-fix-high' },
 ] as const;
 
-// Typing animation hook - fast
-const useTypingAnimation = (text: string, isTyping: boolean) => {
-  const [displayedText, setDisplayedText] = useState('');
+const CRUD_ACTIONS = [
+  { id: 'append', label: 'Add to Note', icon: 'add-box' },
+  { id: 'replace', label: 'Replace Note', icon: 'edit' },
+  { id: 'prepend', label: 'Insert at Top', icon: 'vertical-align-top' },
+] as const;
 
-  useEffect(() => {
-    if (!isTyping) {
-      setDisplayedText(text);
-      return;
-    }
-
-    setDisplayedText('');
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index < text.length) {
-        setDisplayedText(text.substring(0, index + 1));
-        index++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 10); // 10ms per character for fast typing
-
-    return () => clearInterval(interval);
-  }, [text, isTyping]);
-
-  return displayedText;
-};
-
-export function ChatBotAssistant({ onClose, onSaveToNote, initialText }: ChatBotProps) {
+export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: ChatBotProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
+  const [typingIndex, setTypingIndex] = useState<{ [key: string]: number }>({});
   const scrollViewRef = useRef<ScrollView>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Typing animation interval
+  useEffect(() => {
+    const intervals = Object.entries(typingIndex).map(([msgId, index]) => {
+      return setInterval(() => {
+        setMessages(prev => {
+          const msg = prev.find(m => m.id === msgId);
+          if (msg && index < msg.content.length) {
+            setTypingIndex(p => ({ ...p, [msgId]: index + 1 }));
+          }
+          return prev;
+        });
+      }, 15);
+    });
+
+    return () => intervals.forEach(i => clearInterval(i));
+  }, [typingIndex]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
@@ -91,7 +89,7 @@ export function ChatBotAssistant({ onClose, onSaveToNote, initialText }: ChatBot
     const messageText = text || input;
 
     if (!messageText.trim()) {
-      Alert.alert('Empty Message', 'Please type something first');
+      Alert.alert('Empty Message', 'Please type something');
       return;
     }
 
@@ -105,11 +103,10 @@ export function ChatBotAssistant({ onClose, onSaveToNote, initialText }: ChatBot
     };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
-
     setIsLoading(true);
 
     try {
-      const result = await callClaude(messageText, action);
+      const result = await callAI(messageText, action);
 
       if (result.success) {
         const messageId = (Date.now() + 1).toString();
@@ -118,50 +115,47 @@ export function ChatBotAssistant({ onClose, onSaveToNote, initialText }: ChatBot
           role: 'assistant',
           content: result.data || 'No response',
           timestamp: Date.now(),
+          isTyping: true,
+          displayedContent: '',
         };
         setMessages(prev => [...prev, assistantMessage]);
-        setTypingMessageId(messageId);
+        setTypingIndex(p => ({ ...p, [messageId]: 0 }));
       } else {
-        Alert.alert('Error', result.error || 'Failed to get response');
+        Alert.alert('Error', result.error || 'Failed');
       }
     } finally {
       setIsLoading(false);
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
     }
   };
 
-  const saveCurrentResponse = () => {
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.role === 'assistant') {
+  const saveToNote = (messageId: string, action: 'append' | 'replace' | 'prepend') => {
+    const message = messages.find(m => m.id === messageId);
+    if (message?.role === 'assistant') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onSaveToNote?.(lastMessage.content);
-      Alert.alert('✓ Saved', 'Response saved to your note!');
+      onUpdateNote?.(message.content, action);
+      Alert.alert('✓ Saved', `Response ${action === 'append' ? 'added' : action === 'replace' ? 'replaced' : 'inserted'} to note!`);
     }
   };
 
-  const callClaude = async (text: string, action?: string) => {
+  const callAI = async (text: string, action?: string) => {
     try {
       const apiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
 
       if (!apiKey) {
-        return {
-          success: false,
-          error: 'API key not configured',
-        };
+        return { success: false, error: 'API key not configured' };
       }
 
-      let systemPrompt = 'You are a helpful assistant for note-taking. Be concise and friendly.';
+      let systemPrompt = 'You are a helpful note-taking assistant. Be concise.';
 
       if (action === 'summarize') {
-        systemPrompt = 'Summarize the provided text concisely. Return only the summary.';
+        systemPrompt = 'Summarize the text concisely. Return only summary.';
       } else if (action === 'translate') {
         systemPrompt = 'Translate to English. If already English, translate to Spanish. Return only translated text.';
       } else if (action === 'grammar') {
-        systemPrompt = 'Fix grammar and spelling errors. Return only corrected text.';
+        systemPrompt = 'Fix grammar and spelling. Return only corrected text.';
       } else if (action === 'improve') {
-        systemPrompt = 'Improve clarity and tone. Make it more engaging. Return only improved text.';
+        systemPrompt = 'Improve clarity and tone. Make engaging. Return only improved text.';
       }
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -175,14 +169,8 @@ export function ChatBotAssistant({ onClose, onSaveToNote, initialText }: ChatBot
         body: JSON.stringify({
           model: 'arcee-ai/trinity-large-preview:free',
           messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: text,
-            },
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: text },
           ],
           max_tokens: 2048,
         }),
@@ -196,57 +184,34 @@ export function ChatBotAssistant({ onClose, onSaveToNote, initialText }: ChatBot
         } catch (e) {
           errorMessage = await response.text();
         }
-        return {
-          success: false,
-          error: errorMessage,
-        };
+        return { success: false, error: errorMessage };
       }
 
       const data = await response.json();
 
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        return {
-          success: false,
-          error: 'Invalid response from API',
-        };
+      if (!data.choices?.[0]?.message?.content) {
+        return { success: false, error: 'Invalid response' };
       }
 
-      return {
-        success: true,
-        data: data.choices[0].message.content,
-      };
+      return { success: true, data: data.choices[0].message.content };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         success: false,
-        error: errorMessage,
+        error: error instanceof Error ? error.message : 'Error',
       };
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      {/* Header with Save Button */}
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Header */}
       <BlurView intensity={50} tint="dark" style={styles.header}>
         <View style={styles.headerContent}>
           <Pressable onPress={onClose} hitSlop={8}>
             <MaterialIcons name="close" size={24} color={GlassTheme.textPrimary} />
           </Pressable>
           <Text style={styles.headerTitle}>AI Assistant</Text>
-          <Pressable
-            onPress={saveCurrentResponse}
-            hitSlop={8}
-            disabled={!messages.length || messages[messages.length - 1]?.role !== 'assistant'}
-          >
-            <MaterialIcons
-              name="save"
-              size={24}
-              color={messages.length && messages[messages.length - 1]?.role === 'assistant' ? GlassTheme.accentPrimary : GlassTheme.textTertiary}
-            />
-          </Pressable>
+          <View style={{ width: 24 }} />
         </View>
       </BlurView>
 
@@ -261,23 +226,40 @@ export function ChatBotAssistant({ onClose, onSaveToNote, initialText }: ChatBot
           <View style={styles.emptyState}>
             <MaterialIcons name="smart-toy" size={48} color={GlassTheme.textTertiary} />
             <Text style={styles.emptyText}>Start a conversation</Text>
-            <Text style={styles.emptySubtext}>Chat with AI or use suggestions</Text>
           </View>
         )}
 
         {messages.map((msg) => {
-          const isTyping = typingMessageId === msg.id;
-          const displayedContent = useTypingAnimation(msg.content, isTyping);
-          const showCursor = isTyping && displayedContent.length < msg.content.length;
+          const isTyping = msg.isTyping && (typingIndex[msg.id] ?? 0) < msg.content.length;
+          const displayedText = msg.content.substring(0, (typingIndex[msg.id] ?? 0) + 1);
+          const showCursor = isTyping;
 
           return (
-            <View key={msg.id} style={[styles.messageRow, msg.role === 'user' && styles.userRow]}>
-              <View style={[styles.messageBubble, msg.role === 'assistant' && styles.assistantBubble]}>
-                <Text style={[styles.messageText, msg.role === 'user' && styles.userText]}>
-                  {displayedContent}
-                  {showCursor && <Text style={styles.cursor}>▌</Text>}
-                </Text>
+            <View key={msg.id}>
+              <View style={[styles.messageRow, msg.role === 'user' && styles.userRow]}>
+                <View style={[styles.messageBubble, msg.role === 'assistant' && styles.assistantBubble]}>
+                  <Text style={[styles.messageText, msg.role === 'user' && styles.userText]}>
+                    {displayedText}
+                    {showCursor && <Text style={styles.cursor}>▌</Text>}
+                  </Text>
+                </View>
               </View>
+
+              {/* CRUD Buttons for Assistant Messages */}
+              {msg.role === 'assistant' && !isTyping && (
+                <View style={styles.crudContainer}>
+                  {CRUD_ACTIONS.map(action => (
+                    <Pressable
+                      key={action.id}
+                      style={styles.crudButton}
+                      onPress={() => saveToNote(msg.id, action.id as any)}
+                    >
+                      <MaterialIcons name={action.icon as any} size={14} color={GlassTheme.accentPrimary} />
+                      <Text style={styles.crudLabel}>{action.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
             </View>
           );
         })}
@@ -290,7 +272,7 @@ export function ChatBotAssistant({ onClose, onSaveToNote, initialText }: ChatBot
       </ScrollView>
 
       {/* Suggestions */}
-      {messages.length > 0 && !isLoading && typingMessageId === null && (
+      {messages.length > 0 && !isLoading && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -302,9 +284,9 @@ export function ChatBotAssistant({ onClose, onSaveToNote, initialText }: ChatBot
               key={action.id}
               style={styles.suggestionButton}
               onPress={() => {
-                const lastMessage = messages[messages.length - 1];
-                if (lastMessage.role === 'user') {
-                  sendMessage(lastMessage.content, action.id);
+                const lastMsg = messages[messages.length - 1];
+                if (lastMsg?.role === 'user') {
+                  sendMessage(lastMsg.content, action.id);
                 }
               }}
             >
@@ -379,32 +361,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: GlassTheme.textPrimary,
-    marginTop: 12,
-  },
-  emptySubtext: {
-    fontSize: 13,
+    fontSize: 14,
     color: GlassTheme.textSecondary,
-    marginTop: 4,
+    marginTop: 8,
   },
   messageRow: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   userRow: {
     justifyContent: 'flex-end',
   },
   messageBubble: {
     maxWidth: '85%',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
     backgroundColor: GlassTheme.glassBackground,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
@@ -414,15 +389,38 @@ const styles = StyleSheet.create({
     borderColor: GlassTheme.accentPrimary,
   },
   messageText: {
-    fontSize: 14,
+    fontSize: 13,
     color: GlassTheme.textPrimary,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   userText: {
     color: GlassTheme.textPrimary,
   },
   cursor: {
     color: GlassTheme.accentPrimary,
+  },
+  crudContainer: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 12,
+    paddingLeft: 16,
+    flexWrap: 'wrap',
+  },
+  crudButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: `${GlassTheme.accentPrimary}10`,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: GlassTheme.accentPrimary,
+    gap: 4,
+  },
+  crudLabel: {
+    fontSize: 11,
+    color: GlassTheme.accentPrimary,
+    fontWeight: '600',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -444,13 +442,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: GlassTheme.glassBackground,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
-    gap: 6,
+    gap: 5,
   },
   suggestionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: GlassTheme.accentPrimary,
   },
@@ -467,20 +465,20 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     backgroundColor: GlassTheme.glassBackground,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
     color: GlassTheme.textPrimary,
-    fontSize: 14,
+    fontSize: 13,
     maxHeight: 100,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: GlassTheme.glassBackground,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
