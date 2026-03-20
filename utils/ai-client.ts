@@ -65,7 +65,7 @@ export async function processWithAI(
         'X-Title': 'GlassNotes',
       },
       body: JSON.stringify({
-        model: 'arcii/arcii',
+        model: 'arcee/arcee-fast',
         messages: [
           {
             role: 'system',
