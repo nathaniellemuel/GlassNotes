@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GlassTheme } from '@/constants/theme';
 
@@ -18,14 +18,20 @@ export function GlassToast({ title, message, type = 'info', duration = 3000, onD
   useEffect(() => {
     opacity.value = withTiming(1, { duration: 300 });
 
+    const handleDismiss = () => {
+      if (onDismiss) {
+        onDismiss();
+      }
+    };
+
     const timer = setTimeout(() => {
       opacity.value = withTiming(0, { duration: 300 }, () => {
-        onDismiss?.();
+        runOnJS(handleDismiss)();
       });
     }, duration);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [onDismiss, duration]);
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

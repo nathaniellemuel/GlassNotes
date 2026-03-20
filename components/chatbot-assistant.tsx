@@ -6,7 +6,6 @@ import {
   ScrollView,
   Pressable,
   Text,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
@@ -16,6 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { GlassTheme } from '@/constants/theme';
 import * as Haptics from 'expo-haptics';
 import { GlassToast } from '@/components/glass-toast';
+import { AILoading } from '@/components/ai-loading';
 
 interface Message {
   id: string;
@@ -85,7 +85,7 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
 
         return newMessages;
       });
-    }, 15);
+    }, 5);
 
     return () => clearInterval(interval);
   }, [typingIndex, messages]);
@@ -164,6 +164,7 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
   const callAI = async (text: string, action?: string) => {
     try {
       const apiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
+      console.log('[AI] API Key exists:', !!apiKey);
 
       if (!apiKey) {
         return { success: false, error: 'API key not configured' };
@@ -204,6 +205,10 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
         }
       }
 
+      console.log('[AI] Sending request to Open Router...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -220,12 +225,18 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
           ],
           max_tokens: 2048,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+
+      console.log('[AI] Response status:', response.status);
 
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`;
         try {
           const errorData = await response.json();
+          console.log('[AI] Error data:', errorData);
           errorMessage = errorData.error?.message || errorMessage;
         } catch (e) {
           errorMessage = await response.text();
@@ -234,6 +245,7 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
       }
 
       const data = await response.json();
+      console.log('[AI] Response data:', !!data.choices?.length);
 
       if (!data.choices?.[0]?.message?.content) {
         return { success: false, error: 'Invalid response' };
@@ -241,9 +253,11 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
 
       return { success: true, data: data.choices[0].message.content };
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Error';
+      console.log('[AI] Error:', errorMsg);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Error',
+        error: errorMsg.includes('abort') ? 'Request timeout. Please try again.' : errorMsg,
       };
     }
   };
@@ -322,11 +336,7 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
           );
         })}
 
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={GlassTheme.accentPrimary} />
-          </View>
-        )}
+        {isLoading && <AILoading />}
       </ScrollView>
 
       {/* Suggestions */}

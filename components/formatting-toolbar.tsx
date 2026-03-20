@@ -35,44 +35,46 @@ function ToolbarButton({
 }) {
   const scale = useSharedValue(1);
   const longPressTimer = useRef<NodeJS.Timeout>();
+  const longPressTriggered = useRef(false);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   const handlePressIn = () => {
+    longPressTriggered.current = false;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     scale.value = withSpring(0.78, { damping: 10, stiffness: 400 });
 
     if (onLongPress) {
       longPressTimer.current = setTimeout(() => {
+        longPressTriggered.current = true;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onLongPress();
       }, 500);
-    } else {
-      onAction();
     }
   };
 
   const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 10, stiffness: 200 });
+
+    // Clear timer if still running
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = undefined;
     }
-    scale.value = withSpring(1, { damping: 10, stiffness: 200 });
+
+    // Trigger action only if long-press didn't happen
+    if (!longPressTriggered.current) {
+      onAction();
+    }
+    longPressTriggered.current = false;
   };
 
   return (
     <AnimatedPressable
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      onPress={() => {
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current);
-          longPressTimer.current = undefined;
-        }
-        onAction();
-      }}
       style={[styles.button, animStyle]}
       hitSlop={6}
     >
