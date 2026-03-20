@@ -2,6 +2,8 @@
  * ⚠️ WARNING: This implementation exposes API keys in frontend code.
  * For production, implement a proper backend proxy.
  * This is TEMPORARY - for development only.
+ *
+ * Using Open Router API (Arcii model - free tier)
  */
 
 export interface AIProcessResult {
@@ -30,7 +32,7 @@ Return only the improved text without any additional explanation.`,
 };
 
 /**
- * Process text with Claude API directly via REST calls
+ * Process text with Open Router API (Arcii model)
  * ⚠️ API key is exposed in code - NOT for production
  */
 export async function processWithAI(
@@ -45,32 +47,36 @@ export async function processWithAI(
       };
     }
 
-    const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
+    const apiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
     if (!apiKey) {
       return {
         success: false,
-        error: 'API key not configured. Add EXPO_PUBLIC_ANTHROPIC_API_KEY to .env',
+        error: 'API key not configured. Add EXPO_PUBLIC_OPENROUTER_API_KEY to .env',
       };
     }
 
-    // Call Anthropic API directly via REST
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Call Open Router API with Arcii model
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'HTTP-Referer': 'https://glassnotes.app',
+        'X-Title': 'GlassNotes',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-1',
-        max_tokens: 2048,
-        system: SYSTEM_PROMPTS[action],
+        model: 'arcii/arcii',
         messages: [
+          {
+            role: 'system',
+            content: SYSTEM_PROMPTS[action],
+          },
           {
             role: 'user',
             content: text.trim(),
           },
         ],
+        max_tokens: 2048,
       }),
     });
 
@@ -85,7 +91,7 @@ export async function processWithAI(
 
     const data = await response.json();
 
-    if (!data.content || !data.content[0] || data.content[0].type !== 'text') {
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
       return {
         success: false,
         error: 'Unexpected response format from API',
@@ -94,7 +100,7 @@ export async function processWithAI(
 
     return {
       success: true,
-      data: data.content[0].text.trim(),
+      data: data.choices[0].message.content.trim(),
     };
   } catch (error) {
     console.error('[AI Client] Error:', error);

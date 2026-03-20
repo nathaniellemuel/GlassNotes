@@ -105,7 +105,7 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
 
   const callClaude = async (text: string, action?: string) => {
     try {
-      const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
+      const apiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
       console.log('[ChatBot] API Key exists:', !!apiKey);
       console.log('[ChatBot] API Key format:', apiKey?.substring(0, 10) + '...');
 
@@ -129,36 +129,44 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
         systemPrompt = 'You are a note-taking assistant. Improve clarity, readability, and tone of the text. Make it more engaging. Return only the improved text.';
       }
 
-      console.log('[ChatBot] ====== Calling Anthropic API ======');
-      console.log('[ChatBot] Endpoint:', 'https://api.anthropic.com/v1/messages');
+      console.log('[ChatBot] ====== Calling Open Router API ======');
+      console.log('[ChatBot] Endpoint:', 'https://openrouter.ai/api/v1/chat/completions');
       console.log('[ChatBot] Method:', 'POST');
       console.log('[ChatBot] Action:', action || 'chat');
       console.log('[ChatBot] Text length:', text.length);
-      console.log('[ChatBot] Request body:', JSON.stringify({
-        model: 'claude-opus-4-1',
+
+      const requestBody = {
+        model: 'arcii/arcii',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: text,
+          },
+        ],
         max_tokens: 2048,
-        system: systemPrompt.substring(0, 50) + '...',
-        messages: [{ role: 'user', content: text.substring(0, 50) + '...' }],
+      };
+
+      console.log('[ChatBot] Request body:', JSON.stringify({
+        ...requestBody,
+        messages: [
+          { role: 'system', content: systemPrompt.substring(0, 50) + '...' },
+          { role: 'user', content: text.substring(0, 50) + '...' },
+        ],
       }));
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://glassnotes.app',
+          'X-Title': 'GlassNotes',
         },
-        body: JSON.stringify({
-          model: 'claude-opus-4-1',
-          max_tokens: 2048,
-          system: systemPrompt,
-          messages: [
-            {
-              role: 'user',
-              content: text,
-            },
-          ],
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       console.log('[ChatBot] Response status:', response.status, response.statusText);
@@ -171,10 +179,11 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
         try {
           const errorData = await response.json();
           console.log('[ChatBot] Error response body:', errorData);
-          errorMessage = errorData.error?.message || errorMessage;
+          errorMessage = errorData.error?.message || JSON.stringify(errorData) || errorMessage;
         } catch (e) {
           const text = await response.text();
           console.log('[ChatBot] Error response text:', text);
+          errorMessage = text || errorMessage;
         }
         return {
           success: false,
@@ -185,7 +194,8 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
       const data = await response.json();
       console.log('[ChatBot] Success! Response:', data);
 
-      if (!data.content || !data.content[0]) {
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        console.error('[ChatBot] Invalid response structure:', data);
         return {
           success: false,
           error: 'Invalid response format from API',
@@ -194,7 +204,7 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
 
       return {
         success: true,
-        data: data.content[0].text,
+        data: data.choices[0].message.content,
       };
     } catch (error) {
       console.error('[ChatBot] ====== CATCH ERROR ======');
