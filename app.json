@@ -21,7 +21,13 @@
         "foregroundImage": "./assets/logo.jpeg"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.federent.glassnotes"
+      "package": "com.federent.glassnotes",
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -50,6 +56,9 @@
           "photosPermission": "Allow GlassNotes to access your photos so you can insert images into notes.",
           "cameraPermission": "Allow GlassNotes to access your camera to take photos for your notes."
         }
+      ],
+      [
+        "expo-file-system"
       ]
     ],
     "experiments": {

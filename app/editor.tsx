@@ -25,10 +25,12 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { FormattingToolbar } from '@/components/formatting-toolbar';
 import { ChecklistEditor } from '@/components/checklist-editor';
 import { ColorPicker } from '@/components/color-picker';
-import { toggleBold, toggleItalic, toggleHeading, toggleBullet, stripFormatting } from '@/utils/formatting';
+import { TextColorPicker, TextColorId } from '@/components/text-color-picker';
+import { toggleBold, toggleItalic, toggleHeading, toggleBullet, stripFormatting, applyTextColor } from '@/utils/formatting';
 import { generateId } from '@/utils/id';
 import { scheduleNotification, cancelNotification, requestPermissions } from '@/hooks/use-notifications';
 import { NOTE_COLORS } from '@/types/note';
+import { imageUriToBase64, isBase64Uri } from '@/utils/image';
 import type { Note, ChecklistItem, NoteColorId } from '@/types/note';
 
 export default function EditorScreen() {
@@ -43,6 +45,7 @@ export default function EditorScreen() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [colorId, setColorId] = useState<NoteColorId>('default');
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [noteId] = useState(() => id ?? generateId());
   const [isLoaded, setIsLoaded] = useState(false);
   const [reminderAt, setReminderAt] = useState<number | undefined>();
@@ -212,49 +215,119 @@ export default function EditorScreen() {
     contentRef.current?.focus();
   }, [content]);
 
-  const processImageResult = useCallback((result: ImagePicker.ImagePickerResult) => {
+  const processImageResult = useCallback(async (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || result.assets.length === 0) return;
 
-    const image = result.assets[0];
-    setImages(prev => [...prev, image.uri]);
-    Alert.alert('Image Inserted', image.fileName ?? 'Photo added to note.');
-  }, []);
+    try {
+      const image = result.assets[0];
+      console.log('[Editor] Processing image:', {
+        uri: image.uri,
+        fileName: image.fileName,
+        width: image.width,
+        height: image.height,
+        fileSize: image.fileSize,
+      });
+
+      // Convert to base64 for reliable Android APK storage
+      const base64Uri = await imageUriToBase64(image.uri);
+      setImages(prev => [...prev, base64Uri]);
+      Alert.alert('Image Added', image.fileName ?? 'Photo has been added to your note.');
+      console.log('[Editor] Image successfully added, total images:', images.length + 1);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Editor] Image processing error:', errorMessage);
+      console.error('[Editor] Full error:', error);
+      
+      Alert.alert(
+        'Image Error',
+        `Failed to add image: ${errorMessage}\n\nPlease check:\n1. App has storage permissions\n2. Image is accessible\n3. Sufficient device storage`
+      );
+    }
+  }, [images.length]);
 
   const handleLaunchGallery = useCallback(async () => {
     setShowPhotoSourceSheet(false);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    const hasAccess = permission.granted || permission.accessPrivileges === 'limited';
-    if (!hasAccess) {
-      Alert.alert('Permission Required', 'Allow photo access to insert images into your note.');
-      return;
-    }
+    try {
+      console.log('[Editor] Requesting media library permissions...');
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('[Editor] Permission result:', permission);
+      
+      const hasAccess = permission.granted || permission.accessPrivileges === 'limited';
+      if (!hasAccess) {
+        Alert.alert(
+          'Permission Required',
+          'Photos permission is needed to insert images. Please enable it in device settings.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.9,
-    });
-    processImageResult(result);
+      console.log('[Editor] Launching image library...');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.9,
+        allowsMultiple: false,
+        allowsEditing: false,
+      });
+      console.log('[Editor] Image picker result:', result.canceled ? 'Canceled' : 'Got image');
+      await processImageResult(result);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Editor] Gallery error:', errorMessage);
+      console.error('[Editor] Full error:', error);
+      Alert.alert('Error', `Failed to open photo gallery: ${errorMessage}`);
+    }
   }, [processImageResult]);
 
   const handleLaunchCamera = useCallback(async () => {
     setShowPhotoSourceSheet(false);
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission Required', 'Allow camera access to take photos.');
-      return;
-    }
+    try {
+      console.log('[Editor] Requesting camera permissions...');
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      console.log('[Editor] Camera permission result:', permission);
+      
+      if (!permission.granted) {
+        Alert.alert(
+          'Permission Required',
+          'Camera permission is needed to take photos. Please enable it in device settings.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.9,
-    });
-    processImageResult(result);
+      console.log('[Editor] Launching camera...');
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.9,
+        allowsEditing: false,
+      });
+      console.log('[Editor] Camera result:', result.canceled ? 'Canceled' : 'Got photo');
+      await processImageResult(result);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Editor] Camera error:', errorMessage);
+      console.error('[Editor] Full error:', error);
+      Alert.alert('Error', `Failed to open camera: ${errorMessage}`);
+    }
   }, [processImageResult]);
 
   const handleInsertPhoto = useCallback(() => {
     Keyboard.dismiss();
     setShowPhotoSourceSheet(true);
   }, []);
+
+  const handleTextColor = useCallback(() => {
+    setShowTextColorPicker(prev => !prev);
+  }, []);
+
+  const handleApplyTextColor = useCallback((colorId: TextColorId) => {
+    const result = applyTextColor(content, selectionRef.current, colorId);
+    setContent(result.newText);
+    selectionRef.current = result.newSelection;
+    setSelection(result.newSelection);
+    contentRef.current?.focus();
+    setShowTextColorPicker(false);
+  }, [content]);
 
   const handleRemoveImage = useCallback((index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index));
@@ -356,7 +429,14 @@ export default function EditorScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageGallery}>
               {images.map((img, i) => (
                 <Pressable key={i} onPress={() => setPreviewImage(img)} style={styles.imageCard}>
-                  <Image source={{ uri: img }} style={styles.imageThumb} />
+                  <Image
+                    source={{ uri: img }}
+                    style={styles.imageThumb}
+                    onError={(error) => {
+                      console.error(`Error loading image ${i}:`, error);
+                      Alert.alert('Image Load Error', 'Failed to load image. It may be corrupted.');
+                    }}
+                  />
                   <Pressable onPress={() => handleRemoveImage(i)} style={styles.removeImageBtn}>
                     <MaterialIcons name="close" size={16} color="#FFF" />
                   </Pressable>
@@ -389,6 +469,14 @@ export default function EditorScreen() {
 
       {/* Toolbar - always visible at bottom */}
       <View style={[styles.toolbarContainer, { paddingBottom: toolbarPaddingBottom, bottom: toolbarOffset }]}>
+        {showTextColorPicker && (
+          <View style={{ paddingHorizontal: GlassTheme.spacing.md }}>
+            <TextColorPicker
+              onSelect={handleApplyTextColor}
+              onClose={() => setShowTextColorPicker(false)}
+            />
+          </View>
+        )}
         <FormattingToolbar
           onBold={handleBold}
           onItalic={handleItalic}
@@ -397,6 +485,7 @@ export default function EditorScreen() {
           onChecklist={handleChecklist}
           onDivider={handleDivider}
           onPhoto={handleInsertPhoto}
+          onTextColor={handleTextColor}
         />
       </View>
 

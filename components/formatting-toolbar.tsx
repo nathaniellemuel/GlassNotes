@@ -13,6 +13,7 @@ type FormattingToolbarProps = {
   onChecklist: () => void;
   onDivider: () => void;
   onPhoto: () => void;
+  onTextColor: () => void;
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -65,6 +66,7 @@ export function FormattingToolbar({
   onChecklist,
   onDivider,
   onPhoto,
+  onTextColor,
 }: FormattingToolbarProps) {
   return (
     <GlassCard noPadding style={styles.container}>
@@ -72,6 +74,8 @@ export function FormattingToolbar({
         <ToolbarButton icon="format-bold" onAction={onBold} />
         <ToolbarButton icon="format-italic" onAction={onItalic} />
         <ToolbarButton icon="title" onAction={onHeading} />
+        <View style={styles.separator} />
+        <ToolbarButton icon="palette" onAction={onTextColor} color={GlassTheme.accentSecondary} />
         <View style={styles.separator} />
         <ToolbarButton icon="format-list-bulleted" onAction={onBullet} />
         <ToolbarButton icon="check-box" onAction={onChecklist} color={GlassTheme.accentPrimary} />
