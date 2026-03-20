@@ -392,7 +392,6 @@ export default function EditorScreen() {
 
   const handleAIEditorSave = useCallback((processedText: string) => {
     setContent(processedText);
-    setShowAIEditor(false);
   }, []);
 
   const handleRotateImage = useCallback(async (index: number) => {
@@ -808,6 +807,7 @@ export default function EditorScreen() {
           <Modal visible={true} transparent={false} animationType="slide">
             <ChatBotAssistant
               initialText={content}
+              onSaveToNote={handleAIEditorSave}
               onClose={() => setShowAIEditor(false)}
             />
           </Modal>
