@@ -106,10 +106,14 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
   const callClaude = async (text: string, action?: string) => {
     try {
       const apiKey = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
+      console.log('[ChatBot] API Key exists:', !!apiKey);
+      console.log('[ChatBot] API Key format:', apiKey?.substring(0, 10) + '...');
+
       if (!apiKey) {
+        console.error('[ChatBot] API key not found in environment');
         return {
           success: false,
-          error: 'API key not configured',
+          error: 'API key not configured. Check .env file.',
         };
       }
 
@@ -125,8 +129,17 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
         systemPrompt = 'You are a note-taking assistant. Improve clarity, readability, and tone of the text. Make it more engaging. Return only the improved text.';
       }
 
-      console.log('[ChatBot] Calling API with key:', apiKey.substring(0, 20) + '...');
-      console.log('[ChatBot] System prompt:', systemPrompt.substring(0, 50) + '...');
+      console.log('[ChatBot] ====== Calling Anthropic API ======');
+      console.log('[ChatBot] Endpoint:', 'https://api.anthropic.com/v1/messages');
+      console.log('[ChatBot] Method:', 'POST');
+      console.log('[ChatBot] Action:', action || 'chat');
+      console.log('[ChatBot] Text length:', text.length);
+      console.log('[ChatBot] Request body:', JSON.stringify({
+        model: 'claude-opus-4-1',
+        max_tokens: 2048,
+        system: systemPrompt.substring(0, 50) + '...',
+        messages: [{ role: 'user', content: text.substring(0, 50) + '...' }],
+      }));
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -148,24 +161,34 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
         }),
       });
 
-      console.log('[ChatBot] Response status:', response.status);
+      console.log('[ChatBot] Response status:', response.status, response.statusText);
+      console.log('[ChatBot] Response headers:', {
+        'content-type': response.headers.get('content-type'),
+      });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[ChatBot] API Error:', errorData);
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          console.log('[ChatBot] Error response body:', errorData);
+          errorMessage = errorData.error?.message || errorMessage;
+        } catch (e) {
+          const text = await response.text();
+          console.log('[ChatBot] Error response text:', text);
+        }
         return {
           success: false,
-          error: `API Error ${response.status}: ${errorData.error?.message || 'Unknown'}`,
+          error: `API Error: ${errorMessage}`,
         };
       }
 
       const data = await response.json();
-      console.log('[ChatBot] Response data:', data);
+      console.log('[ChatBot] Success! Response:', data);
 
       if (!data.content || !data.content[0]) {
         return {
           success: false,
-          error: 'Invalid response format',
+          error: 'Invalid response format from API',
         };
       }
 
@@ -174,11 +197,15 @@ export function ChatBotAssistant({ onClose, initialText }: ChatBotProps) {
         data: data.content[0].text,
       };
     } catch (error) {
-      console.error('[ChatBot] Catch error:', error);
+      console.error('[ChatBot] ====== CATCH ERROR ======');
+      console.error('[ChatBot] Error type:', error?.constructor?.name);
+      console.error('[ChatBot] Error message:', error instanceof Error ? error.message : String(error));
+      console.error('[ChatBot] Full error:', error);
+
       const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         success: false,
-        error: `Error: ${errorMessage}`,
+        error: `Connection Error: ${errorMessage}`,
       };
     }
   };
