@@ -20,14 +20,14 @@
         "backgroundColor": "#050505",
         "foregroundImage": "./assets/logo.jpeg"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.federent.glassnotes",
       "permissions": [
         "CAMERA",
         "READ_MEDIA_IMAGES",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
-      ]
+      ],
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -46,7 +46,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/logo.jpeg",
           "color": "#8B5CF6"
         }
       ],

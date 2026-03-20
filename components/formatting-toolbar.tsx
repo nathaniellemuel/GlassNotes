@@ -8,7 +8,7 @@ import { GlassTheme } from '@/constants/theme';
 type FormattingToolbarProps = {
   onBold: () => void;
   onItalic: () => void;
-  onHeading: () => void;
+  onUppercase: () => void;
   onBullet: () => void;
   onChecklist: () => void;
   onDivider: () => void;
@@ -61,7 +61,7 @@ function ToolbarButton({
 export function FormattingToolbar({
   onBold,
   onItalic,
-  onHeading,
+  onUppercase,
   onBullet,
   onChecklist,
   onDivider,
@@ -73,7 +73,7 @@ export function FormattingToolbar({
       <View style={styles.inner}>
         <ToolbarButton icon="format-bold" onAction={onBold} />
         <ToolbarButton icon="format-italic" onAction={onItalic} />
-        <ToolbarButton icon="title" onAction={onHeading} />
+        <ToolbarButton icon="title" onAction={onUppercase} />
         <View style={styles.separator} />
         <ToolbarButton icon="palette" onAction={onTextColor} color={GlassTheme.accentSecondary} />
         <View style={styles.separator} />

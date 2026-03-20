@@ -66,12 +66,12 @@ export function TextColorPicker({ selected, onSelect, onClose }: TextColorPicker
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: GlassTheme.glass,
+    backgroundColor: GlassTheme.glassBackground,
     borderRadius: 16,
     padding: 8,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: GlassTheme.border,
+    borderColor: GlassTheme.glassBorder,
   },
   header: {
     paddingHorizontal: 8,

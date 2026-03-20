@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
 /**
@@ -32,15 +33,15 @@ export async function imageUriToBase64(uri: string): Promise<string> {
       console.log('[imageUriToBase64] Reading content:// URI');
       
       // Android content URIs require proper permissions
-      const fileInfo = await FileSystem.getInfoAsync(uri);
+      const fileInfo = await FileSystemLegacy.getInfoAsync(uri);
       console.log('[imageUriToBase64] File info:', fileInfo);
       
       if (!fileInfo.exists) {
         throw new Error('Image file not found or access denied');
       }
 
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+      const base64 = await FileSystemLegacy.readAsStringAsync(uri, {
+        encoding: FileSystemLegacy.EncodingType.Base64,
       });
       
       console.log('[imageUriToBase64] Successfully converted to base64, length:', base64.length);
@@ -51,15 +52,15 @@ export async function imageUriToBase64(uri: string): Promise<string> {
     if (uri.startsWith('file://')) {
       console.log('[imageUriToBase64] Reading file:// URI');
       
-      const fileInfo = await FileSystem.getInfoAsync(uri);
+      const fileInfo = await FileSystemLegacy.getInfoAsync(uri);
       console.log('[imageUriToBase64] File info:', fileInfo);
       
       if (!fileInfo.exists) {
         throw new Error('Image file not found');
       }
 
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+      const base64 = await FileSystemLegacy.readAsStringAsync(uri, {
+        encoding: FileSystemLegacy.EncodingType.Base64,
       });
       
       console.log('[imageUriToBase64] Successfully converted to base64, length:', base64.length);
@@ -68,8 +69,8 @@ export async function imageUriToBase64(uri: string): Promise<string> {
 
     // Try as a regular path (fallback for Android local paths)
     console.log('[imageUriToBase64] Attempting to read as regular path');
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
+    const base64 = await FileSystemLegacy.readAsStringAsync(uri, {
+      encoding: FileSystemLegacy.EncodingType.Base64,
     });
     
     console.log('[imageUriToBase64] Successfully converted to base64, length:', base64.length);

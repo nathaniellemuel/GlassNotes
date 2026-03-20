@@ -19,6 +19,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { GlassTheme } from '@/constants/theme';
 import { useNotes } from '@/hooks/use-notes';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -26,22 +27,45 @@ import { FormattingToolbar } from '@/components/formatting-toolbar';
 import { ChecklistEditor } from '@/components/checklist-editor';
 import { ColorPicker } from '@/components/color-picker';
 import { TextColorPicker, TextColorId, TEXT_COLORS } from '@/components/text-color-picker';
-import { toggleBold, toggleItalic, toggleHeading, toggleBullet, stripFormatting, applyTextColor, COLOR_MARKERS } from '@/utils/formatting';
+import { toggleBold, toggleItalic, toggleUppercase, toggleBullet, stripFormatting, applyTextColor, COLOR_MARKERS, STYLE_MARKERS } from '@/utils/formatting';
 import { generateId } from '@/utils/id';
 import { scheduleNotification, cancelNotification, requestPermissions } from '@/hooks/use-notifications';
 import { NOTE_COLORS } from '@/types/note';
-import { imageUriToBase64, isBase64Uri } from '@/utils/image';
+import { imageUriToBase64 } from '@/utils/image';
 import type { Note, ChecklistItem, NoteColorId } from '@/types/note';
 
 const renderColoredContent = (text: string) => {
   if (!text) return null;
-  const parts = text.split(/([\u2060-\u206D\u206F])/g);
+  const parts = text.split(/([\u200B\u200C\u200D\uFEFF\u2060-\u206D\u206F])/g);
   const elements = [];
   let currentColor: string | undefined = undefined;
+  let isBold = false;
+  let isItalic = false;
 
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
     if (!part) continue;
+
+    if (part === STYLE_MARKERS.bold.start) {
+      isBold = true;
+      elements.push(<Text key={i}>{part}</Text>);
+      continue;
+    }
+    if (part === STYLE_MARKERS.bold.end) {
+      isBold = false;
+      elements.push(<Text key={i}>{part}</Text>);
+      continue;
+    }
+    if (part === STYLE_MARKERS.italic.start) {
+      isItalic = true;
+      elements.push(<Text key={i}>{part}</Text>);
+      continue;
+    }
+    if (part === STYLE_MARKERS.italic.end) {
+      isItalic = false;
+      elements.push(<Text key={i}>{part}</Text>);
+      continue;
+    }
 
     // Check if it's a start marker
     const markerEntry = Object.entries(COLOR_MARKERS).find(([, m]) => m.start === part);
@@ -49,16 +73,23 @@ const renderColoredContent = (text: string) => {
       const colorId = markerEntry[0];
       const colorHex = TEXT_COLORS.find(c => c.id === colorId)?.color;
       currentColor = colorHex;
+      elements.push(<Text key={i}>{part}</Text>);
       continue;
     }
 
     if (part === '\u206F') {
       currentColor = undefined;
+      elements.push(<Text key={i}>{part}</Text>);
       continue;
     }
 
+    const style: any = {};
+    if (currentColor) style.color = currentColor;
+    if (isBold) style.fontWeight = 'bold';
+    if (isItalic) style.fontStyle = 'italic';
+
     elements.push(
-      <Text key={i} style={currentColor ? { color: currentColor } : undefined}>
+      <Text key={i} style={Object.keys(style).length > 0 ? style : undefined}>
         {part}
       </Text>
     );
@@ -76,6 +107,7 @@ export default function EditorScreen() {
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [activeImageOptionIndex, setActiveImageOptionIndex] = useState<number | null>(null);
   const [colorId, setColorId] = useState<NoteColorId>('default');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
@@ -86,6 +118,12 @@ export default function EditorScreen() {
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [showReminderSheet, setShowReminderSheet] = useState(false);
   const [showPhotoSourceSheet, setShowPhotoSourceSheet] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{title: string; message: string; type?: 'success' | 'error'} | null>(null);
+
+  const showToast = useCallback((title: string, message: string, type: 'success' | 'error' = 'success') => {
+    setToastMessage({ title, message, type });
+    setTimeout(() => setToastMessage(null), 3000);
+  }, []);
 
   const contentRef = useRef<TextInput>(null);
   const selectionRef = useRef(selection);
@@ -214,8 +252,8 @@ export default function EditorScreen() {
     contentRef.current?.focus();
   }, [content]);
 
-  const handleHeading = useCallback(() => {
-    const result = toggleHeading(content, selectionRef.current);
+  const handleUppercase = useCallback(() => {
+    const result = toggleUppercase(content, selectionRef.current);
     setContent(result.newText);
     selectionRef.current = result.newSelection;
     setSelection(result.newSelection);
@@ -264,19 +302,16 @@ export default function EditorScreen() {
       // Convert to base64 for reliable Android APK storage
       const base64Uri = await imageUriToBase64(image.uri);
       setImages(prev => [...prev, base64Uri]);
-      Alert.alert('Image Added', image.fileName ?? 'Photo has been added to your note.');
+      showToast('Image Added', 'Photo has been added to your note.', 'success');
       console.log('[Editor] Image successfully added, total images:', images.length + 1);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('[Editor] Image processing error:', errorMessage);
       console.error('[Editor] Full error:', error);
-      
-      Alert.alert(
-        'Image Error',
-        `Failed to add image: ${errorMessage}\n\nPlease check:\n1. App has storage permissions\n2. Image is accessible\n3. Sufficient device storage`
-      );
+
+      showToast('Image Error', `Failed to add image: ${errorMessage}`, 'error');
     }
-  }, [images.length]);
+  }, [images.length, showToast]);
 
   const handleLaunchGallery = useCallback(async () => {
     setShowPhotoSourceSheet(false);
@@ -287,11 +322,7 @@ export default function EditorScreen() {
       
       const hasAccess = permission.granted || permission.accessPrivileges === 'limited';
       if (!hasAccess) {
-        Alert.alert(
-          'Permission Required',
-          'Photos permission is needed to insert images. Please enable it in device settings.',
-          [{ text: 'OK' }]
-        );
+        showToast('Permission Required', 'Permissions are needed. Please enable them in settings.', 'error');
         return;
       }
 
@@ -299,7 +330,7 @@ export default function EditorScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.9,
-        allowsMultiple: false,
+        allowsMultipleSelection: false,
         allowsEditing: false,
       });
       console.log('[Editor] Image picker result:', result.canceled ? 'Canceled' : 'Got image');
@@ -320,11 +351,7 @@ export default function EditorScreen() {
       console.log('[Editor] Camera permission result:', permission);
       
       if (!permission.granted) {
-        Alert.alert(
-          'Permission Required',
-          'Camera permission is needed to take photos. Please enable it in device settings.',
-          [{ text: 'OK' }]
-        );
+        showToast('Permission Required', 'Permissions are needed. Please enable them in settings.', 'error');
         return;
       }
 
@@ -364,19 +391,132 @@ export default function EditorScreen() {
 
   const handleRemoveImage = useCallback((index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index));
+    setActiveImageOptionIndex(null);
   }, []);
+
+  const handleRotateImage = useCallback(async (index: number) => {
+    setActiveImageOptionIndex(null);
+    try {
+      const imgTarget = images[index];
+      const manipResult = await ImageManipulator.manipulateAsync(
+        imgTarget,
+        [{ rotate: 90 }],
+        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      
+      const newBase64 = await imageUriToBase64(manipResult.uri);
+      setImages(prev => {
+        const newImgs = [...prev];
+        newImgs[index] = newBase64;
+        return newImgs;
+      });
+      showToast('Image Rotated', 'Image updated successfully.', 'success');
+    } catch (e) {
+      showToast('Edit Error', 'Failed to rotate image.', 'error');
+    }
+  }, [images, showToast]);
+
+  const handleMoveImage = useCallback((index: number, direction: 'up' | 'down' | 'left' | 'right') => {
+    setActiveImageOptionIndex(null);
+    setImages(prev => {
+      const newImgs = [...prev];
+      if (direction === 'left' && index > 0) {
+        [newImgs[index - 1], newImgs[index]] = [newImgs[index], newImgs[index - 1]];
+      } else if (direction === 'right' && index < newImgs.length - 1) {
+        [newImgs[index + 1], newImgs[index]] = [newImgs[index], newImgs[index + 1]];
+      }
+      return newImgs;
+    });
+  }, []);
+
+  const getImageSize = useCallback((uri: string): Promise<{ width: number; height: number }> => {
+    return new Promise((resolve, reject) => {
+      Image.getSize(
+        uri,
+        (width, height) => resolve({ width, height }),
+        (error) => reject(error)
+      );
+    });
+  }, []);
+
+  const handleCropImage = useCallback(async (index: number) => {
+    setActiveImageOptionIndex(null);
+    try {
+      const imgTarget = images[index];
+      const { width, height } = await getImageSize(imgTarget);
+      const targetAspect = 16 / 9;
+
+      let cropWidth = width;
+      let cropHeight = height;
+      let originX = 0;
+      let originY = 0;
+
+      if (width / height > targetAspect) {
+        cropWidth = height * targetAspect;
+        originX = (width - cropWidth) / 2;
+      } else {
+        cropHeight = width / targetAspect;
+        originY = (height - cropHeight) / 2;
+      }
+
+      const manipResult = await ImageManipulator.manipulateAsync(
+        imgTarget,
+        [{
+          crop: {
+            originX: Math.max(0, Math.floor(originX)),
+            originY: Math.max(0, Math.floor(originY)),
+            width: Math.max(1, Math.floor(cropWidth)),
+            height: Math.max(1, Math.floor(cropHeight)),
+          },
+        }],
+        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      const croppedBase64 = await imageUriToBase64(manipResult.uri);
+      setImages(prev => {
+        const newImgs = [...prev];
+        newImgs[index] = croppedBase64;
+        return newImgs;
+      });
+      showToast('Image Cropped', 'Image has been cropped successfully.', 'success');
+    } catch (e) {
+      showToast('Crop Error', 'Failed to crop image.', 'error');
+    }
+  }, [getImageSize, images, showToast]);
+
+  const handleMirrorImage = useCallback(async (index: number) => {
+    setActiveImageOptionIndex(null);
+    try {
+      const imgTarget = images[index];
+      const manipResult = await ImageManipulator.manipulateAsync(
+        imgTarget,
+        [{ flip: ImageManipulator.FlipType.Horizontal }],
+        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      const mirroredBase64 = await imageUriToBase64(manipResult.uri);
+      setImages(prev => {
+        const newImgs = [...prev];
+        newImgs[index] = mirroredBase64;
+        return newImgs;
+      });
+      showToast('Image Mirrored', 'Image updated successfully.', 'success');
+    } catch (e) {
+      showToast('Edit Error', 'Failed to mirror image.', 'error');
+    }
+  }, [images, showToast]);
 
   const noteColor = NOTE_COLORS.find((c) => c.id === colorId) ?? NOTE_COLORS[0];
   const isDefaultColor = noteColor.id === 'default';
   const activeAccent = isDefaultColor ? GlassTheme.accentPrimary : noteColor.accent;
 
-  const wordCount = stripFormatting(content).trim().split(/\s+/).filter(Boolean).length;
-  const charCount = content.length;
+  const strippedContent = stripFormatting(content);
+  const wordCount = strippedContent.trim().split(/\s+/).filter(Boolean).length;
+  const charCount = strippedContent.length;
   const isKeyboardOpen = keyboardHeight > 0;
   
   // Extra space when keyboard is open to prevent sticking to prediction bars
-  const extraPadding = isKeyboardOpen ? 16 : 0;
-  const toolbarOffset = Math.max(0, keyboardHeight - insets.bottom);
+  const extraPadding = Platform.OS === 'ios' && isKeyboardOpen ? 16 : 0;
   const toolbarPaddingBottom = Math.max(insets.bottom, GlassTheme.spacing.md) + extraPadding;
 
   return (
@@ -385,6 +525,32 @@ export default function EditorScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Animated.View 
+          entering={FadeInDown.duration(300)} 
+          style={[
+            styles.toastContainer, 
+            { top: insets.top + GlassTheme.spacing.md }
+          ]}
+        >
+          <View style={[
+            styles.toastContent, 
+            toastMessage.type === 'error' && styles.toastError
+          ]}>
+            <MaterialIcons 
+              name={toastMessage.type === 'error' ? 'error-outline' : 'check-circle'} 
+              size={24} 
+              color={toastMessage.type === 'error' ? GlassTheme.destructive : GlassTheme.success} 
+            />
+            <View style={styles.toastTextContainer}>
+              <Text style={styles.toastTitle}>{toastMessage.title}</Text>
+              <Text style={styles.toastMessage}>{toastMessage.message}</Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
       {/* Header */}
       <Animated.View
         entering={FadeIn.duration(300)}
@@ -439,7 +605,7 @@ export default function EditorScreen() {
       {/* Editor content */}
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: (isKeyboardOpen ? keyboardHeight : 0) + 120 }]}
         keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
@@ -456,27 +622,47 @@ export default function EditorScreen() {
             blurOnSubmit={false}
           />
 
-          <View style={styles.divider} />
-
           {images.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageGallery}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalImageContainer}>
               {images.map((img, i) => (
-                <Pressable key={i} onPress={() => setPreviewImage(img)} style={styles.imageCard}>
-                  <Image
-                    source={{ uri: img }}
-                    style={styles.imageThumb}
-                    onError={(error) => {
-                      console.error(`Error loading image ${i}:`, error);
-                      Alert.alert('Image Load Error', 'Failed to load image. It may be corrupted.');
-                    }}
-                  />
-                  <Pressable onPress={() => handleRemoveImage(i)} style={styles.removeImageBtn}>
-                    <MaterialIcons name="close" size={16} color="#FFF" />
-                  </Pressable>
-                </Pressable>
+                <View key={i} style={styles.imageItemContainer} onStartShouldSetResponder={() => true}>
+                  <View style={styles.largeImageWrapper}>
+                    <Pressable onPress={() => setPreviewImage(img)} style={{ flex: 1 }}>
+                      <Image
+                        source={{ uri: img }}
+                        style={styles.largeImage}
+                        resizeMode="cover"
+                        onError={(error) => {
+                          console.error(`Error loading image ${i}:`, error);
+                          showToast('Image Load Error', 'Failed to load image. It may be corrupted.', 'error');
+                        }}
+                      />
+                    </Pressable>
+
+                    {/* Remove Button */}
+                    <Pressable onPress={() => handleRemoveImage(i)} style={[styles.imageActionBtn, { right: 8, top: 8 }]}>
+                      <MaterialIcons name="close" size={24} color="#FFF" />     
+                    </Pressable>
+
+
+
+          
+                  </View>
+
+                  <View style={styles.imageReorderRow}>
+                    <Pressable disabled={i === 0} onPress={() => handleMoveImage(i, 'left')}>
+                      <Text style={[styles.imageReorderText, i === 0 && styles.imageReorderTextDisabled]}>Left</Text>
+                    </Pressable>
+                    <Pressable disabled={i === images.length - 1} onPress={() => handleMoveImage(i, 'right')}>
+                      <Text style={[styles.imageReorderText, i === images.length - 1 && styles.imageReorderTextDisabled]}>Right</Text>
+                    </Pressable>
+                  </View>
+                </View>
               ))}
             </ScrollView>
           )}
+
+<View style={styles.divider} />
 
           <TextInput
             ref={contentRef}
@@ -502,7 +688,7 @@ export default function EditorScreen() {
       </ScrollView>
 
       {/* Toolbar - always visible at bottom */}
-      <View style={[styles.toolbarContainer, { paddingBottom: toolbarPaddingBottom, bottom: toolbarOffset }]}>
+      <View style={[styles.toolbarContainer, { paddingBottom: toolbarPaddingBottom, bottom: keyboardHeight }]}>
         {showTextColorPicker && (
           <View style={{ paddingHorizontal: GlassTheme.spacing.md }}>
             <TextColorPicker
@@ -514,7 +700,7 @@ export default function EditorScreen() {
         <FormattingToolbar
           onBold={handleBold}
           onItalic={handleItalic}
-          onHeading={handleHeading}
+          onUppercase={handleUppercase}
           onBullet={handleBullet}
           onChecklist={handleChecklist}
           onDivider={handleDivider}
@@ -679,6 +865,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 50,
+    elevation: 10,
     backgroundColor: GlassTheme.backgroundPrimary,
     borderTopWidth: 1,
     borderTopColor: GlassTheme.glassBorder,
@@ -746,6 +934,110 @@ const styles = StyleSheet.create({
   imageGallery: {
     maxHeight: 120,
     marginBottom: GlassTheme.spacing.md,
+  },
+  horizontalImageContainer: {
+    flexDirection: 'row',
+    paddingVertical: GlassTheme.spacing.md,
+    gap: GlassTheme.spacing.sm,
+  },
+  imageItemContainer: {
+    width: 140,
+    position: 'relative',
+    marginRight: 10,
+  },
+  largeImageWrapper: {
+    width: 140,
+    height: 140,
+    borderRadius: GlassTheme.radius.md,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  largeImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageActionBtn: {
+    position: 'absolute',
+    top: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    zIndex: 2,
+  },
+  imageActionSheet: {
+    position: 'absolute',
+    top: 56,
+    right: 54,
+    backgroundColor: GlassTheme.backgroundElevated,
+    borderRadius: GlassTheme.radius.md,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+    padding: GlassTheme.spacing.xs,
+    width: 140,
+    zIndex: 10,
+    ...GlassTheme.shadowPrimary,
+  },
+  imageOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: GlassTheme.spacing.sm,
+    gap: GlassTheme.spacing.sm,
+  },
+  imageOptionText: {
+    color: GlassTheme.textPrimary,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  imageReorderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+  },
+  imageReorderText: {
+    color: GlassTheme.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  imageReorderTextDisabled: {
+    opacity: 0.35,
+  },
+  toastContainer: {
+    position: 'absolute',
+    left: GlassTheme.spacing.lg,
+    right: GlassTheme.spacing.lg,
+    zIndex: 9999,
+  },
+  toastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GlassTheme.backgroundElevated,
+    borderRadius: GlassTheme.radius.lg,
+    padding: GlassTheme.spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+    ...GlassTheme.shadowPrimary,
+  },
+  toastError: {
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  toastTextContainer: {
+    marginLeft: GlassTheme.spacing.sm,
+    flex: 1,
+  },
+  toastTitle: {
+    color: GlassTheme.textPrimary,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  toastMessage: {
+    color: GlassTheme.textSecondary,
+    fontSize: 14,
+    marginTop: 2,
   },
   imageCard: {
     width: 100,

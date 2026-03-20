@@ -1,9 +1,11 @@
-type Selection = { start: number; end: number };
+const fs = require('fs');
+
+const replacement = `type Selection = { start: number; end: number };
 type FormatResult = { newText: string; newSelection: Selection };
 
 export const STYLE_MARKERS = {
-  bold: { start: '​', end: '‌' },
-  italic: { start: '‍', end: '﻿' },
+  bold: { start: '\u200B', end: '\u200C' },
+  italic: { start: '\u200D', end: '\uFEFF' },
 } as const;
 
 function getWordRange(text: string, cursor: number, wordChar: RegExp): Selection {
@@ -34,7 +36,6 @@ function toggleMarker(text: string, selection: Selection, marker: {start: string
   const before = text.slice(0, targetStart);
   const after = text.slice(targetEnd);
 
-  // If surrounded by markers outside the selection
   if (before.endsWith(marker.start) && after.startsWith(marker.end)) {
     const newText = before.slice(0, -marker.start.length) + selected + after.slice(marker.end.length);
     return {
@@ -43,17 +44,16 @@ function toggleMarker(text: string, selection: Selection, marker: {start: string
     };
   }
 
-  // If the selection contains the start OR end marker anywhere, we REMOVE them (toggle off)
-  if (selected.includes(marker.start) || selected.includes(marker.end)) {
-    const cleanSelected = selected.replace(new RegExp(marker.start, 'g'), '').replace(new RegExp(marker.end, 'g'), '');
-    const newText = before + cleanSelected + after;
+  if (selected.startsWith(marker.start) && selected.endsWith(marker.end)) {
+    const unselected = selected.slice(marker.start.length, -marker.end.length);
+    const newText = before + unselected + after;
     return {
       newText,
-      newSelection: { start: targetStart, end: targetStart + cleanSelected.length },
+      newSelection: { start: targetStart, end: targetStart + unselected.length },
     };
   }
 
-  // Otherwise, ADD them (toggle on)
+  selected = selected.replace(new RegExp(marker.start, 'g'), '').replace(new RegExp(marker.end, 'g'), '');
   const newText = before + marker.start + selected + marker.end + after;
   return {
     newText,
@@ -62,21 +62,21 @@ function toggleMarker(text: string, selection: Selection, marker: {start: string
 }
 
 export function toggleBold(text: string, selection: Selection): FormatResult {
-  return toggleMarker(text, selection, STYLE_MARKERS.bold, /[^\s]/);
+  return toggleMarker(text, selection, STYLE_MARKERS.bold, /[^\\s]/);
 }
 
 export function toggleItalic(text: string, selection: Selection): FormatResult {
-  return toggleMarker(text, selection, STYLE_MARKERS.italic, /[^\s]/);
+  return toggleMarker(text, selection, STYLE_MARKERS.italic, /[^\\s]/);
 }
 
 function toggleLinePrefix(text: string, selection: Selection, prefix: string): FormatResult {
   const { start, end } = selection;
   
   let lineStart = start;
-  while (lineStart > 0 && text[lineStart - 1] !== '\n') lineStart--;
+  while (lineStart > 0 && text[lineStart - 1] !== '\\n') lineStart--;
   
   let lineEnd = end;
-  while (lineEnd < text.length && text[lineEnd] !== '\n') lineEnd++;
+  while (lineEnd < text.length && text[lineEnd] !== '\\n') lineEnd++;
   
   const line = text.slice(lineStart, lineEnd);
   
@@ -137,8 +137,8 @@ export function toggleBullet(text: string, selection: Selection): FormatResult {
 
 export function stripFormatting(text: string): string {
   return text
-    .replace(/[\u200B\u200C\u200D\uFEFF]/g, '')
-    .replace(/[\u2060-\u206F]/g, '')
+    .replace(/[\\u200B\\u200C\\u200D\\uFEFF]/g, '')
+    .replace(/[\\u2060-\\u206F]/g, '')
     .replace(/^# /gm, '')
     .replace(/^- /gm, '')
     .replace(/^---$/gm, '')
@@ -146,15 +146,15 @@ export function stripFormatting(text: string): string {
 }
 
 export const COLOR_MARKERS = {
-  red: { start: '\u2060', end: '\u206F' },
-  orange: { start: '\u2061', end: '\u206F' },
-  yellow: { start: '\u2062', end: '\u206F' },
-  green: { start: '\u2063', end: '\u206F' },
-  blue: { start: '\u2064', end: '\u206F' },
-  purple: { start: '\u206A', end: '\u206F' },
-  pink: { start: '\u206B', end: '\u206F' },
-  cyan: { start: '\u206C', end: '\u206F' },
-  gray: { start: '\u206D', end: '\u206F' },
+  red: { start: '\\u2060', end: '\\u206F' },
+  orange: { start: '\\u2061', end: '\\u206F' },
+  yellow: { start: '\\u2062', end: '\\u206F' },
+  green: { start: '\\u2063', end: '\\u206F' },
+  blue: { start: '\\u2064', end: '\\u206F' },
+  purple: { start: '\\u206A', end: '\\u206F' },
+  pink: { start: '\\u206B', end: '\\u206F' },
+  cyan: { start: '\\u206C', end: '\\u206F' },
+  gray: { start: '\\u206D', end: '\\u206F' },
 } as const;
 
 export type TextColorId = keyof typeof COLOR_MARKERS | 'default';
@@ -165,7 +165,7 @@ export function applyTextColor(text: string, selection: Selection, colorId: Text
   let targetEnd = end;
 
   if (start === end) {
-    const wordRange = getWordRange(text, start, /[^\s]/);
+    const wordRange = getWordRange(text, start, /[^\\s]/);
     targetStart = wordRange.start;
     targetEnd = wordRange.end;
   }
@@ -187,7 +187,7 @@ export function applyTextColor(text: string, selection: Selection, colorId: Text
   }
 
   const marker = COLOR_MARKERS[colorId as keyof typeof COLOR_MARKERS];
-  const colored = `${marker.start}${selected}${marker.end}`;
+  const colored = \`\${marker.start}\${selected}\${marker.end}\`;
   const newText = text.slice(0, targetStart) + colored + text.slice(targetEnd);
 
   return {
@@ -204,3 +204,7 @@ function removeColorMarkers(text: string): string {
   });
   return result;
 }
+`;
+
+fs.writeFileSync('C:/Users/Dragon/Native-Projects/GlassNotes/utils/formatting.ts', replacement);
+console.log("Formatting API updated successfully!");
