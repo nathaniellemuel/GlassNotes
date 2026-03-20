@@ -25,13 +25,46 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { FormattingToolbar } from '@/components/formatting-toolbar';
 import { ChecklistEditor } from '@/components/checklist-editor';
 import { ColorPicker } from '@/components/color-picker';
-import { TextColorPicker, TextColorId } from '@/components/text-color-picker';
-import { toggleBold, toggleItalic, toggleHeading, toggleBullet, stripFormatting, applyTextColor } from '@/utils/formatting';
+import { TextColorPicker, TextColorId, TEXT_COLORS } from '@/components/text-color-picker';
+import { toggleBold, toggleItalic, toggleHeading, toggleBullet, stripFormatting, applyTextColor, COLOR_MARKERS } from '@/utils/formatting';
 import { generateId } from '@/utils/id';
 import { scheduleNotification, cancelNotification, requestPermissions } from '@/hooks/use-notifications';
 import { NOTE_COLORS } from '@/types/note';
 import { imageUriToBase64, isBase64Uri } from '@/utils/image';
 import type { Note, ChecklistItem, NoteColorId } from '@/types/note';
+
+const renderColoredContent = (text: string) => {
+  if (!text) return null;
+  const parts = text.split(/([\u2060-\u206D\u206F])/g);
+  const elements = [];
+  let currentColor: string | undefined = undefined;
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (!part) continue;
+
+    // Check if it's a start marker
+    const markerEntry = Object.entries(COLOR_MARKERS).find(([, m]) => m.start === part);
+    if (markerEntry) {
+      const colorId = markerEntry[0];
+      const colorHex = TEXT_COLORS.find(c => c.id === colorId)?.color;
+      currentColor = colorHex;
+      continue;
+    }
+
+    if (part === '\u206F') {
+      currentColor = undefined;
+      continue;
+    }
+
+    elements.push(
+      <Text key={i} style={currentColor ? { color: currentColor } : undefined}>
+        {part}
+      </Text>
+    );
+  }
+  return elements;
+};
 
 export default function EditorScreen() {
   const insets = useSafeAreaInsets();
@@ -450,7 +483,6 @@ export default function EditorScreen() {
             style={styles.contentInput}
             placeholder="Start writing..."
             placeholderTextColor={GlassTheme.textPlaceholder}
-            value={content}
             onChangeText={setContent}
             onSelectionChange={(e) => {
               selectionRef.current = e.nativeEvent.selection;
@@ -461,7 +493,9 @@ export default function EditorScreen() {
             multiline
             textAlignVertical="top"
             scrollEnabled={false}
-          />
+          >
+            {renderColoredContent(content)}
+          </TextInput>
 
           <ChecklistEditor items={checklist} onChange={setChecklist} />
         </Animated.View>

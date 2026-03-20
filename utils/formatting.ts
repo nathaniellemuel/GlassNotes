@@ -192,22 +192,7 @@ function transformChars(text: string, map: Map<string, string>): string {
 }
 
 export function toggleHeading(text: string, selection: Selection): FormatResult {
-  const { start } = selection;
-  let lineStart = start;
-  while (lineStart > 0 && text[lineStart - 1] !== '\n') lineStart--;
-
-  const lineEnd = text.indexOf('\n', start);
-  const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
-  const line = text.slice(lineStart, actualLineEnd);
-  const hasLetters = /[A-Za-z]/.test(line);
-  if (!hasLetters) return { newText: text, newSelection: selection };
-
-  const newLine = line === line.toUpperCase() ? line.toLowerCase() : line.toUpperCase();
-  const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
-  return {
-    newText,
-    newSelection: selection,
-  };
+  return toggleLinePrefix(text, selection, '# ');
 }
 
 export function toggleBullet(text: string, selection: Selection): FormatResult {
@@ -246,6 +231,8 @@ function toggleLinePrefix(text: string, selection: Selection, prefix: string): F
 export function stripFormatting(text: string): string {
   const normalized = transformChars(transformChars(text, boldReverse), italicReverse);
   return normalized
+    .replace(/[\u2060-\u206F]/g, '')
+    .replace(/[🔴🟠🟡🟢🔵🟣🩷🩵⚪⚫]/g, '')
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
     .replace(/^# /gm, '')
@@ -255,17 +242,17 @@ export function stripFormatting(text: string): string {
     .trim();
 }
 
-// Text color using invisible Unicode markers + color emoji indicators
-const COLOR_MARKERS = {
-  red: { start: '🔴', end: '⚫' },
-  orange: { start: '🟠', end: '⚫' },
-  yellow: { start: '🟡', end: '⚫' },
-  green: { start: '🟢', end: '⚫' },
-  blue: { start: '🔵', end: '⚫' },
-  purple: { start: '🟣', end: '⚫' },
-  pink: { start: '🩷', end: '⚫' },
-  cyan: { start: '🩵', end: '⚫' },
-  gray: { start: '⚪', end: '⚫' },
+// Text color using true invisible Unicode markers
+export const COLOR_MARKERS = {
+  red: { start: '\u2060', end: '\u206F' },
+  orange: { start: '\u2061', end: '\u206F' },
+  yellow: { start: '\u2062', end: '\u206F' },
+  green: { start: '\u2063', end: '\u206F' },
+  blue: { start: '\u2064', end: '\u206F' },
+  purple: { start: '\u206A', end: '\u206F' },
+  pink: { start: '\u206B', end: '\u206F' },
+  cyan: { start: '\u206C', end: '\u206F' },
+  gray: { start: '\u206D', end: '\u206F' },
 } as const;
 
 export type TextColorId = keyof typeof COLOR_MARKERS | 'default';
@@ -301,7 +288,7 @@ export function applyTextColor(text: string, selection: Selection, colorId: Text
   }
 
   // Add new color markers
-  const marker = COLOR_MARKERS[colorId];
+  const marker = COLOR_MARKERS[colorId as keyof typeof COLOR_MARKERS];
   const colored = `${marker.start}${selected}${marker.end}`;
   const newText = text.slice(0, targetStart) + colored + text.slice(targetEnd);
   
@@ -313,11 +300,13 @@ export function applyTextColor(text: string, selection: Selection, colorId: Text
 
 function removeColorMarkers(text: string): string {
   let result = text;
-  // Remove all color marker emojis
+  // Remove all current invisible color markers and old emoji markers
   Object.values(COLOR_MARKERS).forEach(marker => {
     result = result.replace(new RegExp(marker.start, 'g'), '');
     result = result.replace(new RegExp(marker.end, 'g'), '');
   });
+  // Clean up legacy emojis just in case
+  result = result.replace(/[🔴🟠🟡🟢🔵🟣🩷🩵⚪⚫]/g, '');
   return result;
 }
 
