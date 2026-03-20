@@ -278,19 +278,6 @@ export default function EditorScreen() {
     setChecklist((prev) => [...prev, { id: generateId(), text: '', checked: false }]);
   }, []);
 
-  const handleDivider = useCallback(() => {
-    const sel = selectionRef.current;
-    const before = content.slice(0, sel.start);
-    const after = content.slice(sel.end);
-    const divider = '\n---\n';
-    const newText = before + divider + after;
-    const newPos = sel.start + divider.length;
-    setContent(newText);
-    selectionRef.current = { start: newPos, end: newPos };
-    setSelection({ start: newPos, end: newPos });
-    contentRef.current?.focus();
-  }, [content]);
-
   const processImageResult = useCallback(async (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || result.assets.length === 0) return;
 
