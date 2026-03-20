@@ -1,4 +1,4 @@
-import { StyleSheet, Pressable, View, Text, Modal } from 'react-native';
+import { StyleSheet, Pressable, View, Text, Modal, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { GlassCard } from '@/components/glass-card';
@@ -50,49 +50,51 @@ export function ListTypePicker({
         style={styles.backdrop}
         onPress={onClose}
       >
-        <Pressable style={styles.container} onPress={e => e.stopPropagation()}>
-          <GlassCard style={styles.card}>
-            <Text style={styles.title}>List Type</Text>
-            <View style={styles.options}>
-              {LIST_OPTIONS.map((option) => (
-                <Pressable
-                  key={option.id}
-                  style={[
-                    styles.option,
-                    currentType === option.id && styles.optionActive,
-                  ]}
-                  onPress={() => handleSelect(option.id)}
-                >
-                  <MaterialIcons
-                    name={option.icon}
-                    size={24}
-                    color={
-                      currentType === option.id
-                        ? GlassTheme.accentPrimary
-                        : GlassTheme.textSecondary
-                    }
-                  />
-                  <Text
+        <View style={styles.centerContainer}>
+          <Pressable style={styles.container} onPress={e => e.stopPropagation()}>
+            <GlassCard style={styles.card}>
+              <Text style={styles.title}>List Type</Text>
+              <View style={styles.options}>
+                {LIST_OPTIONS.map((option) => (
+                  <Pressable
+                    key={option.id}
                     style={[
-                      styles.optionLabel,
-                      currentType === option.id && styles.optionLabelActive,
+                      styles.option,
+                      currentType === option.id && styles.optionActive,
                     ]}
+                    onPress={() => handleSelect(option.id)}
                   >
-                    {option.label}
-                  </Text>
-                  {currentType === option.id && (
                     <MaterialIcons
-                      name="check"
-                      size={20}
-                      color={GlassTheme.accentPrimary}
-                      style={styles.checkmark}
+                      name={option.icon}
+                      size={24}
+                      color={
+                        currentType === option.id
+                          ? GlassTheme.accentPrimary
+                          : GlassTheme.textSecondary
+                      }
                     />
-                  )}
-                </Pressable>
-              ))}
-            </View>
-          </GlassCard>
-        </Pressable>
+                    <Text
+                      style={[
+                        styles.optionLabel,
+                        currentType === option.id && styles.optionLabelActive,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    {currentType === option.id && (
+                      <MaterialIcons
+                        name="check"
+                        size={20}
+                        color={GlassTheme.accentPrimary}
+                        style={styles.checkmark}
+                      />
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            </GlassCard>
+          </Pressable>
+        </View>
       </Pressable>
     </Modal>
   );
@@ -102,11 +104,15 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  centerContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: GlassTheme.spacing.md,
   },
   container: {
-    width: '80%',
+    width: '100%',
     maxWidth: 300,
   },
   card: {

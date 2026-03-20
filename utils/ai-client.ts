@@ -4,8 +4,6 @@
  * This is TEMPORARY - for development only.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-
 export interface AIProcessResult {
   success: boolean;
   data?: string;
@@ -32,7 +30,7 @@ Return only the improved text without any additional explanation.`,
 };
 
 /**
- * Process text with Claude AI directly from frontend
+ * Process text with Claude API directly via REST calls
  * ⚠️ API key is exposed in code - NOT for production
  */
 export async function processWithAI(
@@ -55,35 +53,48 @@ export async function processWithAI(
       };
     }
 
-    // Initialize Anthropic client with frontend key
-    const client = new Anthropic({
-      apiKey,
-      dangerouslyAllowBrowser: true,
+    // Call Anthropic API directly via REST
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-1',
+        max_tokens: 2048,
+        system: SYSTEM_PROMPTS[action],
+        messages: [
+          {
+            role: 'user',
+            content: text.trim(),
+          },
+        ],
+      }),
     });
 
-    const message = await client.messages.create({
-      model: 'claude-opus-4-1',
-      max_tokens: 2048,
-      system: SYSTEM_PROMPTS[action],
-      messages: [
-        {
-          role: 'user',
-          content: text.trim(),
-        },
-      ],
-    });
-
-    const responseContent = message.content[0];
-    if (responseContent.type !== 'text') {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[AI Client] API Error:', errorData);
       return {
         success: false,
-        error: 'Unexpected response format from AI service',
+        error: `API Error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`,
+      };
+    }
+
+    const data = await response.json();
+
+    if (!data.content || !data.content[0] || data.content[0].type !== 'text') {
+      return {
+        success: false,
+        error: 'Unexpected response format from API',
       };
     }
 
     return {
       success: true,
-      data: responseContent.text.trim(),
+      data: data.content[0].text.trim(),
     };
   } catch (error) {
     console.error('[AI Client] Error:', error);
