@@ -32,7 +32,7 @@ import { generateId } from '@/utils/id';
 import { scheduleNotification, cancelNotification, requestPermissions } from '@/hooks/use-notifications';
 import { NOTE_COLORS } from '@/types/note';
 import { imageUriToBase64 } from '@/utils/image';
-import { AIEditor } from '@/components/ai-editor';
+import { ChatBotAssistant } from '@/components/chatbot-assistant';
 import { ListTypePicker } from '@/components/list-type-picker';
 import type { Note, ChecklistItem, NoteColorId } from '@/types/note';
 
@@ -803,12 +803,11 @@ export default function EditorScreen() {
           onClose={() => setShowListTypePicker(false)}
         />
 
-        {/* AI Editor Modal */}
+        {/* AI Chatbot Modal */}
         {showAIEditor && (
           <Modal visible={true} transparent={false} animationType="slide">
-            <AIEditor
+            <ChatBotAssistant
               initialText={content}
-              onSave={handleAIEditorSave}
               onClose={() => setShowAIEditor(false)}
             />
           </Modal>
