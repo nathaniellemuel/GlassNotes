@@ -4,16 +4,18 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import * as Haptics from 'expo-haptics';
 import { GlassCard } from '@/components/glass-card';
 import { GlassTheme } from '@/constants/theme';
+import { useRef } from 'react';
 
 type FormattingToolbarProps = {
   onBold: () => void;
   onItalic: () => void;
   onUppercase: () => void;
   onBullet: () => void;
+  onBulletLongPress?: () => void;
   onChecklist: () => void;
-  onDivider: () => void;
   onPhoto: () => void;
   onTextColor: () => void;
+  onAI: () => void;
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -21,13 +23,16 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 function ToolbarButton({
   icon,
   onAction,
+  onLongPress,
   color,
 }: {
   icon: keyof typeof MaterialIcons.glyphMap;
   onAction: () => void;
+  onLongPress?: () => void;
   color?: string;
 }) {
   const scale = useSharedValue(1);
+  const longPressTimer = useRef<NodeJS.Timeout>();
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -39,10 +44,22 @@ function ToolbarButton({
   const handlePressIn = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     scale.value = withSpring(0.78, { damping: 10, stiffness: 400 });
-    onAction();
+
+    if (onLongPress) {
+      longPressTimer.current = setTimeout(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onLongPress();
+      }, 500);
+    } else {
+      onAction();
+    }
   };
 
   const handlePressOut = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = undefined;
+    }
     scale.value = withSpring(1, { damping: 10, stiffness: 200 });
   };
 
@@ -50,6 +67,13 @@ function ToolbarButton({
     <AnimatedPressable
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      onPress={() => {
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = undefined;
+        }
+        onAction();
+      }}
       style={[styles.button, animStyle]}
       hitSlop={6}
     >
@@ -63,10 +87,11 @@ export function FormattingToolbar({
   onItalic,
   onUppercase,
   onBullet,
+  onBulletLongPress,
   onChecklist,
-  onDivider,
   onPhoto,
   onTextColor,
+  onAI,
 }: FormattingToolbarProps) {
   return (
     <GlassCard noPadding style={styles.container}>
@@ -77,10 +102,14 @@ export function FormattingToolbar({
         <View style={styles.separator} />
         <ToolbarButton icon="palette" onAction={onTextColor} color={GlassTheme.accentSecondary} />
         <View style={styles.separator} />
-        <ToolbarButton icon="format-list-bulleted" onAction={onBullet} />
+        <ToolbarButton
+          icon="format-list-bulleted"
+          onAction={onBullet}
+          onLongPress={onBulletLongPress}
+        />
         <ToolbarButton icon="check-box" onAction={onChecklist} color={GlassTheme.accentPrimary} />
         <View style={styles.separator} />
-        <ToolbarButton icon="horizontal-rule" onAction={onDivider} />
+        <ToolbarButton icon="auto-fix-high" onAction={onAI} color={GlassTheme.accentPrimary} />
         <ToolbarButton icon="add-a-photo" onAction={onPhoto} color={GlassTheme.accentPrimary} />
       </View>
     </GlassCard>

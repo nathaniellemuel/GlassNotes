@@ -27,11 +27,13 @@ import { FormattingToolbar } from '@/components/formatting-toolbar';
 import { ChecklistEditor } from '@/components/checklist-editor';
 import { ColorPicker } from '@/components/color-picker';
 import { TextColorPicker, TextColorId, TEXT_COLORS } from '@/components/text-color-picker';
-import { toggleBold, toggleItalic, toggleUppercase, toggleBullet, stripFormatting, applyTextColor, COLOR_MARKERS, STYLE_MARKERS } from '@/utils/formatting';
+import { toggleBold, toggleItalic, toggleUppercase, toggleBullet, stripFormatting, applyTextColor, COLOR_MARKERS, STYLE_MARKERS, toggleListType, type ListType } from '@/utils/formatting';
 import { generateId } from '@/utils/id';
 import { scheduleNotification, cancelNotification, requestPermissions } from '@/hooks/use-notifications';
 import { NOTE_COLORS } from '@/types/note';
 import { imageUriToBase64 } from '@/utils/image';
+import { AIEditor } from '@/components/ai-editor';
+import { ListTypePicker } from '@/components/list-type-picker';
 import type { Note, ChecklistItem, NoteColorId } from '@/types/note';
 
 const renderColoredContent = (text: string) => {
@@ -119,6 +121,9 @@ export default function EditorScreen() {
   const [showReminderSheet, setShowReminderSheet] = useState(false);
   const [showPhotoSourceSheet, setShowPhotoSourceSheet] = useState(false);
   const [toastMessage, setToastMessage] = useState<{title: string; message: string; type?: 'success' | 'error'} | null>(null);
+  const [listType, setListType] = useState<ListType>('bullet');
+  const [showListTypePicker, setShowListTypePicker] = useState(false);
+  const [showAIEditor, setShowAIEditor] = useState(false);
 
   const showToast = useCallback((title: string, message: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ title, message, type });
@@ -261,12 +266,12 @@ export default function EditorScreen() {
   }, [content]);
 
   const handleBullet = useCallback(() => {
-    const result = toggleBullet(content, selectionRef.current);
+    const result = toggleListType(content, selectionRef.current, listType);
     setContent(result.newText);
     selectionRef.current = result.newSelection;
     setSelection(result.newSelection);
     contentRef.current?.focus();
-  }, [content]);
+  }, [content, listType]);
 
   const handleChecklist = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -392,6 +397,15 @@ export default function EditorScreen() {
   const handleRemoveImage = useCallback((index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index));
     setActiveImageOptionIndex(null);
+  }, []);
+
+  const handleListTypeChange = useCallback((type: ListType) => {
+    setListType(type);
+  }, []);
+
+  const handleAIEditorSave = useCallback((processedText: string) => {
+    setContent(processedText);
+    setShowAIEditor(false);
   }, []);
 
   const handleRotateImage = useCallback(async (index: number) => {
@@ -702,10 +716,11 @@ export default function EditorScreen() {
           onItalic={handleItalic}
           onUppercase={handleUppercase}
           onBullet={handleBullet}
+          onBulletLongPress={() => setShowListTypePicker(true)}
           onChecklist={handleChecklist}
-          onDivider={handleDivider}
           onPhoto={handleInsertPhoto}
           onTextColor={handleTextColor}
+          onAI={() => setShowAIEditor(true)}
         />
       </View>
 
@@ -790,6 +805,25 @@ export default function EditorScreen() {
                 <MaterialIcons name="close" size={24} color="#FFF" />
               </Pressable>
             </View>
+          </Modal>
+        )}
+
+        {/* List Type Picker */}
+        <ListTypePicker
+          visible={showListTypePicker}
+          currentType={listType}
+          onSelect={handleListTypeChange}
+          onClose={() => setShowListTypePicker(false)}
+        />
+
+        {/* AI Editor Modal */}
+        {showAIEditor && (
+          <Modal visible={true} transparent={false} animationType="slide">
+            <AIEditor
+              initialText={content}
+              onSave={handleAIEditorSave}
+              onClose={() => setShowAIEditor(false)}
+            />
           </Modal>
         )}
       </KeyboardAvoidingView>

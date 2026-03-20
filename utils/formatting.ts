@@ -135,12 +135,79 @@ export function toggleBullet(text: string, selection: Selection): FormatResult {
   return toggleLinePrefix(text, selection, '- ');
 }
 
+export type ListType = 'bullet' | 'number' | 'dash' | 'roman';
+
+const LIST_PREFIXES: Record<ListType, string> = {
+  bullet: '• ',
+  number: '1. ',
+  dash: '— ',
+  roman: 'i. ',
+};
+
+/**
+ * Toggle list type on current line
+ * If line already has a list prefix, replace it with new type
+ * Otherwise, add the new type prefix
+ */
+export function toggleListType(text: string, selection: Selection, type: ListType): FormatResult {
+  const prefix = LIST_PREFIXES[type];
+  const { start, end } = selection;
+
+  let lineStart = start;
+  while (lineStart > 0 && text[lineStart - 1] !== '\n') lineStart--;
+
+  let lineEnd = end;
+  while (lineEnd < text.length && text[lineEnd] !== '\n') lineEnd++;
+
+  const line = text.slice(lineStart, lineEnd);
+
+  // Check if line already has any list prefix
+  const existingPrefixes = Object.values(LIST_PREFIXES);
+  let hasExistingPrefix = false;
+  let existingPrefixLength = 0;
+
+  for (const existingPrefix of existingPrefixes) {
+    if (line.startsWith(existingPrefix)) {
+      hasExistingPrefix = true;
+      existingPrefixLength = existingPrefix.length;
+      break;
+    }
+  }
+
+  if (hasExistingPrefix) {
+    // Replace existing prefix with new one
+    const lineContent = line.slice(existingPrefixLength);
+    const newText = text.slice(0, lineStart) + prefix + lineContent + text.slice(lineEnd);
+    return {
+      newText,
+      newSelection: {
+        start: lineStart + prefix.length,
+        end: lineStart + prefix.length + (end - start),
+      },
+    };
+  } else {
+    // Add new prefix
+    const newText = text.slice(0, lineStart) + prefix + line + text.slice(lineEnd);
+    return {
+      newText,
+      newSelection: {
+        start: start + prefix.length,
+        end: end + prefix.length,
+      },
+    };
+  }
+}
+
 export function stripFormatting(text: string): string {
   return text
     .replace(/[\u200B\u200C\u200D\uFEFF]/g, '')
     .replace(/[\u2060-\u206F]/g, '')
     .replace(/^# /gm, '')
     .replace(/^- /gm, '')
+    .replace(/^• /gm, '')
+    .replace(/^1\. /gm, '')
+    .replace(/^— /gm, '')
+    .replace(/^i\. /gm, '')
     .replace(/^---$/gm, '')
     .trim();
 }
