@@ -55,20 +55,39 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
 
   // Typing animation interval
   useEffect(() => {
-    const intervals = Object.entries(typingIndex).map(([msgId, index]) => {
-      return setInterval(() => {
-        setMessages(prev => {
-          const msg = prev.find(m => m.id === msgId);
-          if (msg && index < msg.content.length) {
-            setTypingIndex(p => ({ ...p, [msgId]: index + 1 }));
-          }
-          return prev;
-        });
-      }, 15);
-    });
+    const typingIds = Object.keys(typingIndex);
+    if (typingIds.length === 0) return;
 
-    return () => intervals.forEach(i => clearInterval(i));
-  }, [typingIndex]);
+    const interval = setInterval(() => {
+      setMessages(prev => {
+        let updated = false;
+        const newMessages = prev.map(msg => {
+          const currentIndex = typingIndex[msg.id] ?? -1;
+          if (msg.isTyping && currentIndex < msg.content.length) {
+            updated = true;
+            return msg;
+          }
+          return msg;
+        });
+
+        if (updated) {
+          setTypingIndex(p => {
+            const newIndex = { ...p };
+            Object.keys(newIndex).forEach(id => {
+              if (newIndex[id] < (messages.find(m => m.id === id)?.content.length ?? 0)) {
+                newIndex[id]++;
+              }
+            });
+            return newIndex;
+          });
+        }
+
+        return newMessages;
+      });
+    }, 15);
+
+    return () => clearInterval(interval);
+  }, [typingIndex, messages]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
@@ -279,21 +298,26 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
           style={styles.suggestionsContainer}
           contentContainerStyle={styles.suggestionsContent}
         >
-          {SUGGESTION_ACTIONS.map((action) => (
-            <Pressable
-              key={action.id}
-              style={styles.suggestionButton}
-              onPress={() => {
-                const lastMsg = messages[messages.length - 1];
-                if (lastMsg?.role === 'user') {
-                  sendMessage(lastMsg.content, action.id);
-                }
-              }}
-            >
-              <MaterialIcons name={action.icon as any} size={16} color={GlassTheme.accentPrimary} />
-              <Text style={styles.suggestionLabel}>{action.label}</Text>
-            </Pressable>
-          ))}
+          {SUGGESTION_ACTIONS.map((action) => {
+            const lastMsg = messages[messages.length - 1];
+            const isDisabled = !lastMsg || lastMsg.role !== 'user';
+
+            return (
+              <Pressable
+                key={action.id}
+                style={[styles.suggestionButton, isDisabled && styles.suggestionButtonDisabled]}
+                onPress={() => {
+                  if (!isDisabled) {
+                    sendMessage(lastMsg.content, action.id);
+                  }
+                }}
+                disabled={isDisabled}
+              >
+                <MaterialIcons name={action.icon as any} size={16} color={isDisabled ? GlassTheme.textTertiary : GlassTheme.accentPrimary} />
+                <Text style={[styles.suggestionLabel, isDisabled && styles.suggestionLabelDisabled]}>{action.label}</Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       )}
 
@@ -447,10 +471,16 @@ const styles = StyleSheet.create({
     borderColor: GlassTheme.glassBorder,
     gap: 5,
   },
+  suggestionButtonDisabled: {
+    opacity: 0.5,
+  },
   suggestionLabel: {
     fontSize: 11,
     fontWeight: '600',
     color: GlassTheme.accentPrimary,
+  },
+  suggestionLabelDisabled: {
+    color: GlassTheme.textTertiary,
   },
   inputContainer: {
     borderTopWidth: 1,

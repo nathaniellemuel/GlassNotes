@@ -1,4 +1,4 @@
-import { StyleSheet, Pressable, View } from 'react-native';
+import { StyleSheet, Pressable, View, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -22,11 +22,13 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function ToolbarButton({
   icon,
+  label,
   onAction,
   onLongPress,
   color,
 }: {
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon?: keyof typeof MaterialIcons.glyphMap;
+  label?: string;
   onAction: () => void;
   onLongPress?: () => void;
   color?: string;
@@ -38,9 +40,6 @@ function ToolbarButton({
     transform: [{ scale: scale.value }],
   }));
 
-  // IMPORTANT: Use onPressIn, not onPress.
-  // On Android, tapping a button blurs the TextInput first ("blur" fires before "press").
-  // onPressIn fires while the input is still focused, so selectionRef is still accurate.
   const handlePressIn = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     scale.value = withSpring(0.78, { damping: 10, stiffness: 400 });
@@ -77,7 +76,13 @@ function ToolbarButton({
       style={[styles.button, animStyle]}
       hitSlop={6}
     >
-      <MaterialIcons name={icon} size={21} color={color ?? GlassTheme.textSecondary} />
+      {icon ? (
+        <MaterialIcons name={icon} size={21} color={color ?? GlassTheme.textSecondary} />
+      ) : (
+        <Text style={[styles.buttonText, { color: color ?? GlassTheme.textSecondary }]}>
+          {label}
+        </Text>
+      )}
     </AnimatedPressable>
   );
 }
@@ -109,7 +114,7 @@ export function FormattingToolbar({
         />
         <ToolbarButton icon="check-box" onAction={onChecklist} color={GlassTheme.accentPrimary} />
         <View style={styles.separator} />
-        <ToolbarButton icon="auto-fix-high" onAction={onAI} color={GlassTheme.accentPrimary} />
+        <ToolbarButton label="AI" onAction={onAI} color={GlassTheme.accentPrimary} />
         <ToolbarButton icon="add-a-photo" onAction={onPhoto} color={GlassTheme.accentPrimary} />
       </View>
     </GlassCard>
@@ -134,6 +139,11 @@ const styles = StyleSheet.create({
     borderRadius: GlassTheme.radius.sm,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   separator: {
     width: 1,
