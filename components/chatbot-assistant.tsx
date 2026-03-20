@@ -7,7 +7,6 @@ import {
   Pressable,
   Text,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
@@ -16,6 +15,7 @@ import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GlassTheme } from '@/constants/theme';
 import * as Haptics from 'expo-haptics';
+import { GlassToast } from '@/components/glass-toast';
 
 interface Message {
   id: string;
@@ -50,6 +50,7 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [typingIndex, setTypingIndex] = useState<{ [key: string]: number }>({});
+  const [toast, setToast] = useState<{ title: string; message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -105,10 +106,12 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
   }, []);
 
   const sendMessage = async (text?: string, action?: string) => {
-    const messageText = text || input;
+    // Capture the input immediately to prevent stale state issues
+    const capturedInput = input;
+    const messageText = text || capturedInput.trim();
 
-    if (!messageText.trim()) {
-      Alert.alert('Empty Message', 'Please type something');
+    if (!messageText) {
+      setToast({ title: 'Empty Message', message: 'Please type something', type: 'error' });
       return;
     }
 
@@ -140,7 +143,7 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
         setMessages(prev => [...prev, assistantMessage]);
         setTypingIndex(p => ({ ...p, [messageId]: 0 }));
       } else {
-        Alert.alert('Error', result.error || 'Failed');
+        setToast({ title: 'Error', message: result.error || 'Failed to get response', type: 'error' });
       }
     } finally {
       setIsLoading(false);
@@ -153,7 +156,8 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
     if (message?.role === 'assistant') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onUpdateNote?.(message.content, action);
-      Alert.alert('✓ Saved', `Response ${action === 'append' ? 'added' : action === 'replace' ? 'replaced' : 'inserted'} to note!`);
+      const actionText = action === 'append' ? 'added' : action === 'replace' ? 'replaced' : 'inserted';
+      setToast({ title: '✓ Saved', message: `Response ${actionText} to note!`, type: 'success' });
     }
   };
 
@@ -166,15 +170,38 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
       }
 
       let systemPrompt = 'You are a helpful note-taking assistant. Be concise.';
+      let userContent = text;
 
-      if (action === 'summarize') {
-        systemPrompt = 'Summarize the text concisely. Return only summary.';
-      } else if (action === 'translate') {
-        systemPrompt = 'Translate to English. If already English, translate to Spanish. Return only translated text.';
-      } else if (action === 'grammar') {
-        systemPrompt = 'Fix grammar and spelling. Return only corrected text.';
-      } else if (action === 'improve') {
-        systemPrompt = 'Improve clarity and tone. Make engaging. Return only improved text.';
+      // Include current note content in the context
+      if (currentNoteContent) {
+        const noteContext = `\n\nCurrent note content:\n"${currentNoteContent}"`;
+
+        if (action === 'summarize') {
+          systemPrompt = 'Summarize the text concisely. Return only summary.';
+          userContent = text + noteContext;
+        } else if (action === 'translate') {
+          systemPrompt = 'Translate to English. If already English, translate to Spanish. Return only translated text.';
+          userContent = text + noteContext;
+        } else if (action === 'grammar') {
+          systemPrompt = 'Fix grammar and spelling. Return only corrected text.';
+          userContent = text + noteContext;
+        } else if (action === 'improve') {
+          systemPrompt = 'Improve clarity and tone. Make engaging. Return only improved text.';
+          userContent = text + noteContext;
+        } else {
+          // For general chat, include note context
+          userContent = text + noteContext;
+        }
+      } else {
+        if (action === 'summarize') {
+          systemPrompt = 'Summarize the text concisely. Return only summary.';
+        } else if (action === 'translate') {
+          systemPrompt = 'Translate to English. If already English, translate to Spanish. Return only translated text.';
+        } else if (action === 'grammar') {
+          systemPrompt = 'Fix grammar and spelling. Return only corrected text.';
+        } else if (action === 'improve') {
+          systemPrompt = 'Improve clarity and tone. Make engaging. Return only improved text.';
+        }
       }
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -189,7 +216,7 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
           model: 'arcee-ai/trinity-large-preview:free',
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: text },
+            { role: 'user', content: userContent },
           ],
           max_tokens: 2048,
         }),
@@ -223,6 +250,16 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Toast Notification */}
+      {toast && (
+        <GlassToast
+          title={toast.title}
+          message={toast.message}
+          type={toast.type}
+          onDismiss={() => setToast(null)}
+        />
+      )}
+
       {/* Header */}
       <BlurView intensity={50} tint="dark" style={styles.header}>
         <View style={styles.headerContent}>
@@ -249,8 +286,10 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
         )}
 
         {messages.map((msg) => {
-          const isTyping = msg.isTyping && (typingIndex[msg.id] ?? 0) < msg.content.length;
-          const displayedText = msg.content.substring(0, (typingIndex[msg.id] ?? 0) + 1);
+          const isTyping = msg.role === 'assistant' && msg.isTyping && (typingIndex[msg.id] ?? 0) < msg.content.length;
+          const displayedText = isTyping
+            ? msg.content.substring(0, (typingIndex[msg.id] ?? 0) + 1)
+            : msg.content;
           const showCursor = isTyping;
 
           return (
