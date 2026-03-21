@@ -356,38 +356,33 @@ export type TextColorId = keyof typeof COLOR_MARKERS | 'default';
 
 export function applyTextColor(text: string, selection: Selection, colorId: TextColorId): FormatResult {
   const { start, end } = selection;
-  let targetStart = start;
-  let targetEnd = end;
 
+  // If no selection, do nothing for color (require explicit selection)
   if (start === end) {
-    const wordRange = getWordRange(text, start, /[^\s]/);
-    targetStart = wordRange.start;
-    targetEnd = wordRange.end;
-  }
-
-  if (targetStart === targetEnd) {
     return { newText: text, newSelection: selection };
   }
 
-  let selected = text.slice(targetStart, targetEnd);
+  // Get selected text and remove existing color markers
+  let selectedText = text.slice(start, end);
+  const cleanSelected = removeColorMarkers(selectedText);
 
-  selected = removeColorMarkers(selected);
-
+  // If "default" color, just remove color markers (revert to white)
   if (colorId === 'default') {
-    const newText = text.slice(0, targetStart) + selected + text.slice(targetEnd);
+    const newText = text.slice(0, start) + cleanSelected + text.slice(end);
     return {
       newText,
-      newSelection: { start: targetStart, end: targetStart + selected.length },
+      newSelection: { start, end: start + cleanSelected.length },
     };
   }
 
+  // Apply new color to the clean (unmarked) selected text
   const marker = COLOR_MARKERS[colorId as keyof typeof COLOR_MARKERS];
-  const colored = `${marker.start}${selected}${marker.end}`;
-  const newText = text.slice(0, targetStart) + colored + text.slice(targetEnd);
+  const colored = `${marker.start}${cleanSelected}${marker.end}`;
+  const newText = text.slice(0, start) + colored + text.slice(end);
 
   return {
     newText,
-    newSelection: { start: targetStart, end: targetStart + colored.length },
+    newSelection: { start, end: start + colored.length },
   };
 }
 
