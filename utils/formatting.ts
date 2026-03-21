@@ -1,6 +1,12 @@
 type Selection = { start: number; end: number };
 type FormatResult = { newText: string; newSelection: Selection };
 
+// Style markers for bold and italic (invisible Unicode characters)
+export const STYLE_MARKERS = {
+  bold: { start: '​', end: '‌' },
+  italic: { start: '‍', end: '﻿' },
+} as const;
+
 // Bold + Italic Unicode pairs (combined styling)
 const BOLD_ITALIC_PAIRS: Array<[string, string]> = [
   ['A', '𝑨'], ['B', '𝑩'], ['C', '𝑪'], ['D', '𝑫'], ['E', '𝑬'], ['F', '𝑭'], ['G', '𝑮'], ['H', '𝑯'], ['I', '𝑰'], ['J', '𝑱'], ['K', '𝑲'], ['L', '𝑳'], ['M', '𝑴'],
