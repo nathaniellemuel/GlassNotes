@@ -670,9 +670,23 @@ export default function EditorScreen() {
 
 <View style={styles.divider} />
 
+          {/* Colored text display overlay */}
+          {content.trim() && (
+            <Pressable
+              onPress={() => contentRef.current?.focus()}
+              style={styles.coloredTextDisplay}
+              pointerEvents="box-none"
+            >
+              <Text style={styles.contentInput}>
+                {renderColoredContent(content)}
+              </Text>
+            </Pressable>
+          )}
+
           <TextInput
             ref={contentRef}
-            style={styles.contentInput}
+            value={content}
+            style={[styles.contentInput, { color: content.trim() ? 'transparent' : GlassTheme.textPlaceholder }]}
             placeholder="Start writing..."
             placeholderTextColor={GlassTheme.textPlaceholder}
             onChangeText={setContent}
@@ -685,9 +699,7 @@ export default function EditorScreen() {
             multiline
             textAlignVertical="top"
             scrollEnabled={false}
-          >
-            {renderColoredContent(content)}
-          </TextInput>
+          />
 
           <ChecklistEditor items={checklist} onChange={setChecklist} />
         </Animated.View>
@@ -878,6 +890,14 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: GlassTheme.glassBorder,
     marginVertical: GlassTheme.spacing.sm,
+  },
+  coloredTextDisplay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 0,
+    pointerEvents: 'none',
   },
   contentInput: {
     fontSize: 16,
