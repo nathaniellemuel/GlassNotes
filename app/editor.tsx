@@ -79,7 +79,9 @@ const renderColoredContent = (text: string) => {
       continue;
     }
 
-    if (part === '\u206F') {
+    // Check if it's an end marker (for any color)
+    const endMarkerEntry = Object.entries(COLOR_MARKERS).find(([, m]) => m.end === part);
+    if (endMarkerEntry) {
       currentColor = undefined;
       elements.push(<Text key={i}>{part}</Text>);
       continue;
@@ -670,36 +672,39 @@ export default function EditorScreen() {
 
 <View style={styles.divider} />
 
-          {/* Colored text display overlay */}
-          {content.trim() && (
-            <Pressable
-              onPress={() => contentRef.current?.focus()}
-              style={styles.coloredTextDisplay}
-              pointerEvents="box-none"
-            >
-              <Text style={styles.contentInput}>
-                {renderColoredContent(content)}
-              </Text>
-            </Pressable>
-          )}
+          {/* Content editor container with overlay */}
+          <View style={styles.contentEditorContainer}>
+            {/* Colored text display overlay */}
+            {content.trim() && (
+              <Pressable
+                onPress={() => contentRef.current?.focus()}
+                style={styles.coloredTextDisplay}
+                pointerEvents="box-none"
+              >
+                <Text style={styles.contentInput}>
+                  {renderColoredContent(content)}
+                </Text>
+              </Pressable>
+            )}
 
-          <TextInput
-            ref={contentRef}
-            value={content}
-            style={[styles.contentInput, { color: content.trim() ? 'transparent' : GlassTheme.textPlaceholder }]}
-            placeholder="Start writing..."
-            placeholderTextColor={GlassTheme.textPlaceholder}
-            onChangeText={setContent}
-            onSelectionChange={(e) => {
-              selectionRef.current = e.nativeEvent.selection;
-              setSelection(e.nativeEvent.selection);
-            }}
-            selectionColor={GlassTheme.accentPrimary}
-            selection={selection}
-            multiline
-            textAlignVertical="top"
-            scrollEnabled={false}
-          />
+            <TextInput
+              ref={contentRef}
+              value={content}
+              style={[styles.contentInput, { color: content.trim() ? 'transparent' : GlassTheme.textPlaceholder }]}
+              placeholder="Start writing..."
+              placeholderTextColor={GlassTheme.textPlaceholder}
+              onChangeText={setContent}
+              onSelectionChange={(e) => {
+                selectionRef.current = e.nativeEvent.selection;
+                setSelection(e.nativeEvent.selection);
+              }}
+              selectionColor={GlassTheme.accentPrimary}
+              selection={selection}
+              multiline
+              textAlignVertical="top"
+              scrollEnabled={false}
+            />
+          </View>
 
           <ChecklistEditor items={checklist} onChange={setChecklist} />
         </Animated.View>
@@ -891,12 +896,16 @@ const styles = StyleSheet.create({
     backgroundColor: GlassTheme.glassBorder,
     marginVertical: GlassTheme.spacing.sm,
   },
+  contentEditorContainer: {
+    position: 'relative',
+    minHeight: 200,
+  },
   coloredTextDisplay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 0,
+    zIndex: 1,
     pointerEvents: 'none',
   },
   contentInput: {
@@ -905,6 +914,8 @@ const styles = StyleSheet.create({
     color: GlassTheme.textPrimary,
     minHeight: 200,
     paddingTop: GlassTheme.spacing.sm,
+    paddingLeft: 0,
+    paddingRight: 0,
   },
   toolbarContainer: {
     position: 'absolute',
