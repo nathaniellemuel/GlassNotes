@@ -12,6 +12,7 @@ import {
   Keyboard,
   Modal,
   Image,
+  AppState,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -187,6 +188,19 @@ export default function EditorScreen() {
       showSub.remove();
       hideSub.remove();
     };
+  }, []);
+
+  // Reset keyboard height when app state changes to prevent toolbar hiding
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') {
+        // App backgrounded - reset keyboard state
+        setKeyboardHeight(0);
+        Keyboard.dismiss();
+      }
+    });
+
+    return () => subscription.remove();
   }, []);
 
   const handleDelete = () => {
@@ -371,6 +385,7 @@ export default function EditorScreen() {
   }, []);
 
   const handleTextColor = useCallback(() => {
+    Keyboard.dismiss();
     setShowTextColorPicker(prev => !prev);
   }, []);
 
@@ -528,11 +543,12 @@ export default function EditorScreen() {
   const toolbarPaddingBottom = Math.max(insets.bottom, GlassTheme.spacing.md) + extraPadding;
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: GlassTheme.backgroundPrimary }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-    >
+    <View style={styles.screenContainer}>
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: GlassTheme.backgroundPrimary }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
       {/* Toast Notification */}
       {toastMessage && (
         <Animated.View 
@@ -710,8 +726,16 @@ export default function EditorScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Toolbar - always visible at bottom */}
-      <View style={[styles.toolbarContainer, { paddingBottom: toolbarPaddingBottom, bottom: keyboardHeight }]}>
+      {/* Toolbar - fixed at bottom */}
+      <View style={styles.toolbarContainer}>
+        {/* List Type Picker - popover above toolbar */}
+        <ListTypePicker
+          visible={showListTypePicker}
+          currentType={listType}
+          onSelect={handleListTypeChange}
+          onClose={() => setShowListTypePicker(false)}
+        />
+
         {showTextColorPicker && (
           <View style={{ paddingHorizontal: GlassTheme.spacing.md }}>
             <TextColorPicker
@@ -732,7 +756,9 @@ export default function EditorScreen() {
           onAI={() => setShowAIEditor(true)}
         />
       </View>
+      </KeyboardAvoidingView>
 
+      {/* Modals */}
       <Modal visible={showReminderSheet} transparent animationType="fade">
         <Pressable
           style={[
@@ -817,14 +843,6 @@ export default function EditorScreen() {
           </Modal>
         )}
 
-        {/* List Type Picker */}
-        <ListTypePicker
-          visible={showListTypePicker}
-          currentType={listType}
-          onSelect={handleListTypeChange}
-          onClose={() => setShowListTypePicker(false)}
-        />
-
         {/* AI Chatbot Modal */}
         {showAIEditor && (
           <Modal visible={true} transparent={false} animationType="slide">
@@ -835,14 +853,19 @@ export default function EditorScreen() {
             />
           </Modal>
         )}
-      </KeyboardAvoidingView>
+      </View>
     );
 }
 
 const styles = StyleSheet.create({
+  screenContainer: {
+    flex: 1,
+    backgroundColor: GlassTheme.backgroundPrimary,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: GlassTheme.backgroundPrimary,
+    flexDirection: 'column',
   },
   header: {
     flexDirection: 'row',

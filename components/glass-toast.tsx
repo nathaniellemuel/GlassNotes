@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GlassTheme } from '@/constants/theme';
 
@@ -14,9 +15,11 @@ interface GlassToastProps {
 
 export function GlassToast({ title, message, type = 'info', duration = 3000, onDismiss }: GlassToastProps) {
   const opacity = useSharedValue(0);
+  const translateY = useSharedValue(-20);
 
   useEffect(() => {
     opacity.value = withTiming(1, { duration: 300 });
+    translateY.value = withTiming(0, { duration: 300 });
 
     const handleDismiss = () => {
       if (onDismiss) {
@@ -25,7 +28,8 @@ export function GlassToast({ title, message, type = 'info', duration = 3000, onD
     };
 
     const timer = setTimeout(() => {
-      opacity.value = withTiming(0, { duration: 300 }, () => {
+      opacity.value = withTiming(0, { duration: 300 });
+      translateY.value = withTiming(-20, { duration: 300 }, () => {
         runOnJS(handleDismiss)();
       });
     }, duration);
@@ -35,43 +39,53 @@ export function GlassToast({ title, message, type = 'info', duration = 3000, onD
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
   }));
 
-  const getIcon = () => {
+  const getIconData = () => {
     switch (type) {
       case 'success':
-        return 'check-circle';
+        return { icon: 'check-circle', bgColor: '#10B98120', color: '#10B981' };
       case 'error':
-        return 'error';
+        return { icon: 'error', bgColor: '#EF444420', color: '#EF4444' };
       default:
-        return 'info';
+        return { icon: 'info', bgColor: `${GlassTheme.accentPrimary}20`, color: GlassTheme.accentPrimary };
     }
   };
 
-  const getColor = () => {
-    switch (type) {
-      case 'success':
-        return '#4CAF50';
-      case 'error':
-        return '#F44336';
-      default:
-        return GlassTheme.accentPrimary;
-    }
-  };
-
-  const color = getColor();
+  const iconData = getIconData();
 
   return (
     <Animated.View style={[styles.container, animStyle]}>
-      <View style={[styles.toast, { borderLeftColor: color }]}>
-        <View style={styles.iconContainer}>
-          <MaterialIcons name={getIcon() as any} size={24} color={color} />
+      <BlurView intensity={95} tint="dark" style={styles.blurContainer}>
+        <View style={[styles.toast, { borderLeftColor: iconData.color }]}>
+          {/* Icon with colored background */}
+          <View style={[styles.iconBackground, { backgroundColor: iconData.bgColor }]}>
+            <MaterialIcons name={iconData.icon as any} size={24} color={iconData.color} />
+          </View>
+
+          {/* Content */}
+          <View style={styles.content}>
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={styles.message} numberOfLines={2}>
+              {message}
+            </Text>
+          </View>
+
+          {/* Close button */}
+          <Pressable
+            onPress={() => {
+              opacity.value = withTiming(0, { duration: 200 });
+              if (onDismiss) runOnJS(onDismiss)();
+            }}
+            hitSlop={8}
+          >
+            <MaterialIcons name="close" size={18} color={GlassTheme.textTertiary} />
+          </Pressable>
         </View>
-        <View style={styles.content}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
-        </View>
-      </View>
+      </BlurView>
     </Animated.View>
   );
 }
@@ -79,38 +93,47 @@ export function GlassToast({ title, message, type = 'info', duration = 3000, onD
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 60,
-    left: 16,
-    right: 16,
+    top: 50,
+    left: 12,
+    right: 12,
     zIndex: 1000,
+  },
+  blurContainer: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   toast: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: GlassTheme.glassBackground,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
+    alignItems: 'center',
     borderLeftWidth: 4,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     gap: 12,
   },
-  iconContainer: {
-    paddingTop: 2,
+  iconBackground: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
   },
   content: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   title: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: GlassTheme.textPrimary,
+    letterSpacing: 0.3,
   },
   message: {
     fontSize: 12,
     color: GlassTheme.textSecondary,
     lineHeight: 16,
+    fontWeight: '400',
   },
 });

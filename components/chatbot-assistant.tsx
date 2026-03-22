@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Modal,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -32,18 +33,51 @@ interface ChatBotProps {
   currentNoteContent?: string;
 }
 
-const SUGGESTION_ACTIONS = [
-  { id: 'summarize', label: 'Summarize', icon: 'summarize' },
-  { id: 'translate', label: 'Translate', icon: 'translate' },
-  { id: 'grammar', label: 'Fix Grammar', icon: 'spellcheck' },
-  { id: 'improve', label: 'Improve', icon: 'auto-fix-high' },
+const LANGUAGE_OPTIONS = [
+  { id: 'english', label: 'English' },
+  { id: 'spanish', label: 'Español' },
+  { id: 'indonesian', label: 'Bahasa Indonesia' },
+  { id: 'french', label: 'Français' },
+  { id: 'german', label: 'Deutsch' },
+  { id: 'japanese', label: '日本語' },
+  { id: 'chinese', label: '中文' },
 ] as const;
+
+// Clean markdown formatting from AI response
+const cleanMarkdownResponse = (text: string): string => {
+  // Remove **bold** markers
+  return text
+    .replace(/\*\*/g, '')
+    .replace(/\*\*/g, '')
+    .replace(/`/g, '')
+    .replace(/###/g, '')
+    .replace(/##/g, '')
+    .replace(/#/g, '');
+};
 
 const CRUD_ACTIONS = [
   { id: 'append', label: 'Add to Note', icon: 'add-box' },
   { id: 'replace', label: 'Replace Note', icon: 'edit' },
   { id: 'prepend', label: 'Insert at Top', icon: 'vertical-align-top' },
 ] as const;
+
+const AI_SYSTEM_PROMPT = `You are Glassy AI, a friendly writing assistant for a note-taking app. Help users with their note content.
+
+ALLOWED:
+- Summarize text
+- Translate to other languages
+- Fix grammar and spelling
+- Improve writing clarity
+- Reformat into bullet points
+- Answer questions about note content
+
+DO NOT:
+- Generate images or code
+- Answer general knowledge questions
+- Go off-topic from the note
+- Write harmful content
+
+Always be concise. Respond in the user's language unless translating.`;
 
 export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: ChatBotProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -53,6 +87,31 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
   const [toast, setToast] = useState<{ title: string; message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState('english');
+  const [pendingTranslateAction, setPendingTranslateAction] = useState<{ id: string } | null>(null);
+
+  // Show welcome message on first load
+  useEffect(() => {
+    const welcomeMessage: Message = {
+      id: '0',
+      role: 'assistant',
+      content: `Hi! I'm Glassy AI, your friendly note-taking assistant! I can help you:
+• Summarize your notes
+• Translate to any language
+• Fix grammar and spelling
+• Improve writing and clarity
+• Reformat into bullet points
+• Answer questions about your content
+
+Just describe what you need. After I respond, you can apply changes directly to your note using the buttons below!`,
+      timestamp: Date.now(),
+      isTyping: true,
+      displayedContent: '',
+    };
+    setMessages([welcomeMessage]);
+    setTypingIndex({ '0': 0 });
+  }, []);
 
   // Typing animation interval
   useEffect(() => {
@@ -106,12 +165,16 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
   }, []);
 
   const sendMessage = async (text?: string, action?: string) => {
-    // Capture the input immediately to prevent stale state issues
     const capturedInput = input;
     const messageText = text || capturedInput.trim();
 
     if (!messageText) {
-      setToast({ title: 'Empty Message', message: 'Please type something', type: 'error' });
+      setToast({ title: 'Empty Message', message: 'Please type something...', type: 'error' });
+      return;
+    }
+
+    if (!currentNoteContent) {
+      setToast({ title: 'No Note Content', message: 'Add text to your note first', type: 'error' });
       return;
     }
 
@@ -132,10 +195,11 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
 
       if (result.success) {
         const messageId = (Date.now() + 1).toString();
+        const cleanedResponse = cleanMarkdownResponse(result.data || 'No response');
         const assistantMessage: Message = {
           id: messageId,
           role: 'assistant',
-          content: result.data || 'No response',
+          content: cleanedResponse,
           timestamp: Date.now(),
           isTyping: true,
           displayedContent: '',
@@ -143,7 +207,12 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
         setMessages(prev => [...prev, assistantMessage]);
         setTypingIndex(p => ({ ...p, [messageId]: 0 }));
       } else {
-        setToast({ title: 'Error', message: result.error || 'Failed to get response', type: 'error' });
+        const errorMsg = result.error || 'Something went wrong';
+        setToast({
+          title: 'Could not process',
+          message: errorMsg === 'API key not configured' ? 'AI service unavailable' : errorMsg.substring(0, 60),
+          type: 'error'
+        });
       }
     } finally {
       setIsLoading(false);
@@ -155,7 +224,9 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
     const message = messages.find(m => m.id === messageId);
     if (message?.role === 'assistant') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      onUpdateNote?.(message.content, action);
+      // Clean markdown before saving
+      const cleanedContent = cleanMarkdownResponse(message.content);
+      onUpdateNote?.(cleanedContent, action);
       const actionText = action === 'append' ? 'added' : action === 'replace' ? 'replaced' : 'inserted';
       setToast({ title: '✓ Saved', message: `Response ${actionText} to note!`, type: 'success' });
     }
@@ -164,50 +235,32 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
   const callAI = async (text: string, action?: string) => {
     try {
       const apiKey = process.env.EXPO_PUBLIC_OPENROUTER_API_KEY;
-      console.log('[AI] API Key exists:', !!apiKey);
 
       if (!apiKey) {
         return { success: false, error: 'API key not configured' };
       }
 
-      let systemPrompt = 'You are a helpful note-taking assistant. Be concise.';
+      let systemPrompt = AI_SYSTEM_PROMPT;
       let userContent = text;
 
-      // Include current note content in the context
-      if (currentNoteContent) {
-        const noteContext = `\n\nCurrent note content:\n"${currentNoteContent}"`;
-
-        if (action === 'summarize') {
-          systemPrompt = 'Summarize the text concisely. Return only summary.';
-          userContent = text + noteContext;
-        } else if (action === 'translate') {
-          systemPrompt = 'Translate to English. If already English, translate to Spanish. Return only translated text.';
-          userContent = text + noteContext;
-        } else if (action === 'grammar') {
-          systemPrompt = 'Fix grammar and spelling. Return only corrected text.';
-          userContent = text + noteContext;
-        } else if (action === 'improve') {
-          systemPrompt = 'Improve clarity and tone. Make engaging. Return only improved text.';
-          userContent = text + noteContext;
-        } else {
-          // For general chat, include note context
-          userContent = text + noteContext;
-        }
+      // Add context for specific actions
+      if (action === 'translate') {
+        const lang = LANGUAGE_OPTIONS.find(l => l.id === selectedLanguage)?.label || 'English';
+        systemPrompt = `Translate text to ${lang} ONLY. Output the translation and nothing else.`;
+        userContent = `Translate to ${lang}:\n\n${currentNoteContent}`;
+      } else if (action === 'summarize') {
+        systemPrompt = `Summarize the text concisely. Output ONLY the summary, no extra text.`;
+        userContent = `Summarize:\n\n${currentNoteContent}`;
+      } else if (action === 'grammar') {
+        systemPrompt = `Fix grammar and spelling. Output ONLY the corrected text, nothing else.`;
+        userContent = `Fix grammar:\n\n${currentNoteContent}`;
+      } else if (action === 'improve') {
+        systemPrompt = `Improve clarity and tone. Make it engaging. Output ONLY the improved text.`;
+        userContent = `Improve:\n\n${currentNoteContent}`;
       } else {
-        if (action === 'summarize') {
-          systemPrompt = 'Summarize the text concisely. Return only summary.';
-        } else if (action === 'translate') {
-          systemPrompt = 'Translate to English. If already English, translate to Spanish. Return only translated text.';
-        } else if (action === 'grammar') {
-          systemPrompt = 'Fix grammar and spelling. Return only corrected text.';
-        } else if (action === 'improve') {
-          systemPrompt = 'Improve clarity and tone. Make engaging. Return only improved text.';
-        }
+        // General chat with note context
+        userContent = `My note: "${currentNoteContent}"\n\nMy question: ${text}`;
       }
-
-      console.log('[AI] Sending request to Open Router...');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -216,45 +269,40 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://glassnotes.app',
           'X-Title': 'GlassNotes',
+          'User-Agent': 'GlassNotes/1.0',
         },
         body: JSON.stringify({
-          model: 'arcee-ai/trinity-large-preview:free',
+          model: 'openrouter/free',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
           ],
           max_tokens: 2048,
+          temperature: 0.7,
         }),
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
-
-      console.log('[AI] Response status:', response.status);
 
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`;
         try {
           const errorData = await response.json();
-          console.log('[AI] Error data:', errorData);
-          errorMessage = errorData.error?.message || errorMessage;
+          errorMessage = errorData.error?.message || errorData.error || JSON.stringify(errorData);
         } catch (e) {
-          errorMessage = await response.text();
+          const textError = await response.text();
+          errorMessage = textError || errorMessage;
         }
         return { success: false, error: errorMessage };
       }
 
       const data = await response.json();
-      console.log('[AI] Response data:', !!data.choices?.length);
 
       if (!data.choices?.[0]?.message?.content) {
-        return { success: false, error: 'Invalid response' };
+        return { success: false, error: 'Invalid response from AI' };
       }
 
       return { success: true, data: data.choices[0].message.content };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error';
-      console.log('[AI] Error:', errorMsg);
       return {
         success: false,
         error: errorMsg.includes('abort') ? 'Request timeout. Please try again.' : errorMsg,
@@ -264,7 +312,6 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* Toast Notification */}
       {toast && (
         <GlassToast
           title={toast.title}
@@ -274,18 +321,16 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
         />
       )}
 
-      {/* Header */}
       <BlurView intensity={50} tint="dark" style={styles.header}>
         <View style={styles.headerContent}>
           <Pressable onPress={onClose} hitSlop={8}>
             <MaterialIcons name="close" size={24} color={GlassTheme.textPrimary} />
           </Pressable>
-          <Text style={styles.headerTitle}>AI Assistant</Text>
+          <Text style={styles.headerTitle}>Glassy AI</Text>
           <View style={{ width: 24 }} />
         </View>
       </BlurView>
 
-      {/* Messages */}
       <ScrollView
         ref={scrollViewRef}
         style={styles.messagesContainer}
@@ -317,7 +362,6 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
                 </View>
               </View>
 
-              {/* CRUD Buttons for Assistant Messages */}
               {msg.role === 'assistant' && !isTyping && (
                 <View style={styles.crudContainer}>
                   {CRUD_ACTIONS.map(action => (
@@ -339,43 +383,52 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
         {isLoading && <AILoading />}
       </ScrollView>
 
-      {/* Suggestions */}
-      {messages.length > 0 && !isLoading && (
+      {!isLoading && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.suggestionsContainer}
-          contentContainerStyle={styles.suggestionsContent}
+          style={styles.actionsContainer}
+          contentContainerStyle={styles.actionsContent}
         >
-          {SUGGESTION_ACTIONS.map((action) => {
-            const lastMsg = messages[messages.length - 1];
-            const isDisabled = !lastMsg || lastMsg.role !== 'user';
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => sendMessage(undefined, 'summarize')}
+          >
+            <MaterialIcons name="summarize" size={16} color={GlassTheme.accentPrimary} />
+            <Text style={styles.actionLabel}>Summarize</Text>
+          </Pressable>
 
-            return (
-              <Pressable
-                key={action.id}
-                style={[styles.suggestionButton, isDisabled && styles.suggestionButtonDisabled]}
-                onPress={() => {
-                  if (!isDisabled) {
-                    sendMessage(lastMsg.content, action.id);
-                  }
-                }}
-                disabled={isDisabled}
-              >
-                <MaterialIcons name={action.icon as any} size={16} color={isDisabled ? GlassTheme.textTertiary : GlassTheme.accentPrimary} />
-                <Text style={[styles.suggestionLabel, isDisabled && styles.suggestionLabelDisabled]}>{action.label}</Text>
-              </Pressable>
-            );
-          })}
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => setShowLanguagePicker(true)}
+          >
+            <MaterialIcons name="translate" size={16} color={GlassTheme.accentPrimary} />
+            <Text style={styles.actionLabel}>Translate</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => sendMessage(undefined, 'grammar')}
+          >
+            <MaterialIcons name="spellcheck" size={16} color={GlassTheme.accentPrimary} />
+            <Text style={styles.actionLabel}>Fix Grammar</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => sendMessage(undefined, 'improve')}
+          >
+            <MaterialIcons name="auto-fix-high" size={16} color={GlassTheme.accentPrimary} />
+            <Text style={styles.actionLabel}>Improve</Text>
+          </Pressable>
         </ScrollView>
       )}
 
-      {/* Input */}
       <BlurView intensity={50} tint="dark" style={[styles.inputContainer, { paddingBottom: keyboardHeight > 0 ? 12 : 16 }]}>
         <View style={styles.inputRow}>
           <TextInput
             style={styles.input}
-            placeholder="Message..."
+            placeholder="Ask me anything..."
             placeholderTextColor={GlassTheme.textPlaceholder}
             value={input}
             onChangeText={setInput}
@@ -396,6 +449,30 @@ export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: 
           </Pressable>
         </View>
       </BlurView>
+
+      {/* Language Picker Modal */}
+      <Modal visible={showLanguagePicker} transparent animationType="fade" onRequestClose={() => setShowLanguagePicker(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowLanguagePicker(false)}>
+          <View style={styles.languageModal} onStartShouldSetResponder={() => true}>
+            <Text style={styles.languageTitle}>Select Language</Text>
+            {LANGUAGE_OPTIONS.map((lang) => (
+              <Pressable
+                key={lang.id}
+                style={[styles.languageOption, selectedLanguage === lang.id && styles.languageOptionActive]}
+                onPress={() => {
+                  setSelectedLanguage(lang.id);
+                  setShowLanguagePicker(false);
+                  sendMessage(undefined, 'translate');
+                }}
+              >
+                <Text style={[styles.languageOptionText, selectedLanguage === lang.id && styles.languageOptionTextActive]}>
+                  {lang.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -495,21 +572,17 @@ const styles = StyleSheet.create({
     color: GlassTheme.accentPrimary,
     fontWeight: '600',
   },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  suggestionsContainer: {
+  actionsContainer: {
     borderTopWidth: 1,
     borderTopColor: GlassTheme.glassBorder,
     maxHeight: 50,
   },
-  suggestionsContent: {
+  actionsContent: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
   },
-  suggestionButton: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
@@ -520,16 +593,10 @@ const styles = StyleSheet.create({
     borderColor: GlassTheme.glassBorder,
     gap: 5,
   },
-  suggestionButtonDisabled: {
-    opacity: 0.5,
-  },
-  suggestionLabel: {
+  actionLabel: {
     fontSize: 11,
     fontWeight: '600',
     color: GlassTheme.accentPrimary,
-  },
-  suggestionLabelDisabled: {
-    color: GlassTheme.textTertiary,
   },
   inputContainer: {
     borderTopWidth: 1,
@@ -566,5 +633,48 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  languageModal: {
+    backgroundColor: GlassTheme.glassBackground,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+    padding: 16,
+    maxHeight: '80%',
+    width: '100%',
+  },
+  languageTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: GlassTheme.textPrimary,
+    marginBottom: 12,
+  },
+  languageOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+    backgroundColor: GlassTheme.backgroundPrimary,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+  },
+  languageOptionActive: {
+    backgroundColor: `${GlassTheme.accentPrimary}15`,
+    borderColor: GlassTheme.accentPrimary,
+  },
+  languageOptionText: {
+    fontSize: 14,
+    color: GlassTheme.textSecondary,
+  },
+  languageOptionTextActive: {
+    color: GlassTheme.accentPrimary,
+    fontWeight: '600',
   },
 });
