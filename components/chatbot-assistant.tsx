@@ -11,6 +11,7 @@ import {
   Keyboard,
   Modal,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import { GlassTheme } from '@/constants/theme';
@@ -80,6 +81,7 @@ DO NOT:
 Always be concise. Respond in the user's language unless translating.`;
 
 export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: ChatBotProps) {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -325,7 +327,11 @@ Just describe what you need. After I respond, you can apply changes directly to 
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
       {toast && (
         <GlassToast
           title={toast.title}
@@ -335,7 +341,7 @@ Just describe what you need. After I respond, you can apply changes directly to 
         />
       )}
 
-      <BlurView intensity={50} tint="dark" style={styles.header}>
+      <BlurView intensity={50} tint="dark" style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
         <View style={styles.headerContent}>
           <Pressable onPress={onClose} hitSlop={8}>
             <MaterialIcons name="close" size={24} color={GlassTheme.textPrimary} />
@@ -349,7 +355,10 @@ Just describe what you need. After I respond, you can apply changes directly to 
         ref={scrollViewRef}
         style={styles.messagesContainer}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.messagesContent}
+        contentContainerStyle={[
+          styles.messagesContent,
+          { paddingBottom: Math.max(insets.bottom, 12) }
+        ]}
       >
         {messages.length === 0 && (
           <View style={styles.emptyState}>
@@ -438,7 +447,10 @@ Just describe what you need. After I respond, you can apply changes directly to 
         </ScrollView>
       )}
 
-      <BlurView intensity={50} tint="dark" style={[styles.inputContainer, { paddingBottom: keyboardHeight > 0 ? 12 : 16 }]}>
+      <BlurView intensity={50} tint="dark" style={[
+        styles.inputContainer,
+        { paddingBottom: Math.max(insets.bottom, 12) + 8 }
+      ]}>
         <View style={styles.inputRow}>
           <TextInput
             style={styles.input}
@@ -501,6 +513,7 @@ const styles = StyleSheet.create({
     borderBottomColor: GlassTheme.glassBorder,
     paddingVertical: 12,
     paddingHorizontal: 16,
+    paddingBottom: 12,
   },
   headerContent: {
     flexDirection: 'row',
@@ -508,11 +521,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: GlassTheme.textPrimary,
     flex: 1,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   messagesContainer: {
     flex: 1,
@@ -540,82 +554,87 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   messageBubble: {
-    maxWidth: '85%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
+    maxWidth: '80%',
     backgroundColor: GlassTheme.glassBackground,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   assistantBubble: {
-    backgroundColor: `${GlassTheme.accentPrimary}15`,
-    borderColor: GlassTheme.accentPrimary,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   messageText: {
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 20,
     color: GlassTheme.textPrimary,
-    lineHeight: 18,
   },
   userText: {
     color: GlassTheme.textPrimary,
   },
   cursor: {
-    color: GlassTheme.accentPrimary,
+    backgroundColor: GlassTheme.accentPrimary,
+    marginLeft: 2,
   },
   crudContainer: {
     flexDirection: 'row',
     gap: 6,
+    marginTop: 6,
     marginBottom: 12,
-    paddingLeft: 16,
     flexWrap: 'wrap',
   },
   crudButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: `${GlassTheme.accentPrimary}10`,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: GlassTheme.accentPrimary,
-    gap: 4,
-  },
-  crudLabel: {
-    fontSize: 11,
-    color: GlassTheme.accentPrimary,
-    fontWeight: '600',
-  },
-  actionsContainer: {
-    borderTopWidth: 1,
-    borderTopColor: GlassTheme.glassBorder,
-    maxHeight: 50,
-  },
-  actionsContent: {
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  crudLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: GlassTheme.accentPrimary,
+  },
+  actionsContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: GlassTheme.glassBorder,
+    flexGrow: 0,
+    flexShrink: 0,
+    maxHeight: 60,
+  },
+  actionsContent: {
     gap: 8,
+    alignItems: 'center',
+    paddingRight: 24,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: GlassTheme.glassBackground,
-    borderRadius: 10,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
-    gap: 5,
   },
   actionLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: GlassTheme.accentPrimary,
   },
   inputContainer: {
     borderTopWidth: 1,
     borderTopColor: GlassTheme.glassBorder,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 12,
   },
   inputRow: {
@@ -625,70 +644,69 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: GlassTheme.glassBackground,
-    borderRadius: 10,
+    backgroundColor: GlassTheme.backgroundElevated,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
     color: GlassTheme.textPrimary,
-    fontSize: 13,
     maxHeight: 100,
   },
   sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: GlassTheme.glassBackground,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   sendButtonDisabled: {
     opacity: 0.5,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
   },
   languageModal: {
-    backgroundColor: GlassTheme.glassBackground,
+    backgroundColor: GlassTheme.backgroundElevated,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
-    padding: 16,
+    padding: 20,
     maxHeight: '80%',
-    width: '100%',
   },
   languageTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: GlassTheme.textPrimary,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   languageOption: {
-    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     marginBottom: 8,
-    backgroundColor: GlassTheme.backgroundPrimary,
     borderWidth: 1,
     borderColor: GlassTheme.glassBorder,
   },
   languageOptionActive: {
-    backgroundColor: `${GlassTheme.accentPrimary}15`,
+    backgroundColor: `${GlassTheme.accentPrimary}20`,
     borderColor: GlassTheme.accentPrimary,
   },
   languageOptionText: {
     fontSize: 14,
+    fontWeight: '500',
     color: GlassTheme.textSecondary,
   },
   languageOptionTextActive: {
     color: GlassTheme.accentPrimary,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

@@ -544,41 +544,13 @@ export default function EditorScreen() {
 
   return (
     <View style={styles.screenContainer}>
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: GlassTheme.backgroundPrimary }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-      {/* Toast Notification */}
-      {toastMessage && (
-        <Animated.View 
-          entering={FadeInDown.duration(300)} 
-          style={[
-            styles.toastContainer, 
-            { top: insets.top + GlassTheme.spacing.md }
-          ]}
-        >
-          <View style={[
-            styles.toastContent, 
-            toastMessage.type === 'error' && styles.toastError
-          ]}>
-            <MaterialIcons 
-              name={toastMessage.type === 'error' ? 'error-outline' : 'check-circle'} 
-              size={24} 
-              color={toastMessage.type === 'error' ? GlassTheme.destructive : GlassTheme.success} 
-            />
-            <View style={styles.toastTextContainer}>
-              <Text style={styles.toastTitle}>{toastMessage.title}</Text>
-              <Text style={styles.toastMessage}>{toastMessage.message}</Text>
-            </View>
-          </View>
-        </Animated.View>
-      )}
-
-      {/* Header */}
+      {/* Header with proper top inset */}
       <Animated.View
         entering={FadeIn.duration(300)}
-        style={[styles.header, { paddingTop: insets.top + GlassTheme.spacing.sm }]}
+        style={[
+          styles.header,
+          { paddingTop: Math.max(insets.top, 12) + GlassTheme.spacing.sm }
+        ]}
       >
         <Pressable onPress={() => router.back()} style={styles.headerButton} hitSlop={8}>
           <MaterialIcons name="arrow-back-ios" size={22} color={GlassTheme.textPrimary} />
@@ -621,113 +593,146 @@ export default function EditorScreen() {
         </View>
       </Animated.View>
 
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Animated.View
+          entering={FadeInDown.duration(300)}
+          style={[
+            styles.toastContainer,
+            { top: Math.max(insets.top, 12) + 60 }
+          ]}
+        >
+          <View style={[
+            styles.toastContent,
+            toastMessage.type === 'error' && styles.toastError
+          ]}>
+            <MaterialIcons
+              name={toastMessage.type === 'error' ? 'error-outline' : 'check-circle'}
+              size={24}
+              color={toastMessage.type === 'error' ? GlassTheme.destructive : GlassTheme.success}
+            />
+            <View style={styles.toastTextContainer}>
+              <Text style={styles.toastTitle}>{toastMessage.title}</Text>
+              <Text style={styles.toastMessage}>{toastMessage.message}</Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
       {/* Color picker */}
       {showColorPicker && (
         <ColorPicker selected={colorId} onSelect={(id) => { setColorId(id); setShowColorPicker(false); }} />
       )}
 
-      {/* Editor content */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: (isKeyboardOpen ? keyboardHeight : 0) + 120 }]}
-        keyboardDismissMode="interactive"
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Animated.View entering={FadeInDown.duration(400).delay(100)}>
-          <TextInput
-            style={styles.titleInput}
-            placeholder="Note title"
-            placeholderTextColor={GlassTheme.textPlaceholder}
-            value={title}
-            onChangeText={setTitle}
-            selectionColor={GlassTheme.accentPrimary}
-            returnKeyType="next"
-            onSubmitEditing={() => contentRef.current?.focus()}
-            blurOnSubmit={false}
-          />
+        {/* Editor content */}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: 100 + Math.max(insets.bottom, 12) }
+          ]}
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View entering={FadeInDown.duration(400).delay(100)}>
+            <TextInput
+              style={styles.titleInput}
+              placeholder="Note title"
+              placeholderTextColor={GlassTheme.textPlaceholder}
+              value={title}
+              onChangeText={setTitle}
+              selectionColor={GlassTheme.accentPrimary}
+              returnKeyType="next"
+              onSubmitEditing={() => contentRef.current?.focus()}
+              blurOnSubmit={false}
+            />
 
-          {images.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalImageContainer}>
-              {images.map((img, i) => (
-                <View key={i} style={styles.imageItemContainer} onStartShouldSetResponder={() => true}>
-                  <View style={styles.largeImageWrapper}>
-                    <Pressable onPress={() => setPreviewImage(img)} style={{ flex: 1 }}>
-                      <Image
-                        source={{ uri: img }}
-                        style={styles.largeImage}
-                        resizeMode="cover"
-                        onError={(error) => {
-                          console.error(`Error loading image ${i}:`, error);
-                          showToast('Image Load Error', 'Failed to load image. It may be corrupted.', 'error');
-                        }}
-                      />
-                    </Pressable>
+            {images.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalImageContainer}>
+                {images.map((img, i) => (
+                  <View key={i} style={styles.imageItemContainer} onStartShouldSetResponder={() => true}>
+                    <View style={styles.largeImageWrapper}>
+                      <Pressable onPress={() => setPreviewImage(img)} style={{ flex: 1 }}>
+                        <Image
+                          source={{ uri: img }}
+                          style={styles.largeImage}
+                          resizeMode="cover"
+                          onError={(error) => {
+                            console.error(`Error loading image ${i}:`, error);
+                            showToast('Image Load Error', 'Failed to load image. It may be corrupted.', 'error');
+                          }}
+                        />
+                      </Pressable>
 
-                    {/* Remove Button */}
-                    <Pressable onPress={() => handleRemoveImage(i)} style={[styles.imageActionBtn, { right: 8, top: 8 }]}>
-                      <MaterialIcons name="close" size={24} color="#FFF" />     
-                    </Pressable>
+                      {/* Remove Button */}
+                      <Pressable onPress={() => handleRemoveImage(i)} style={[styles.imageActionBtn, { right: 8, top: 8 }]}>
+                        <MaterialIcons name="close" size={24} color="#FFF" />
+                      </Pressable>
+                    </View>
 
-
-
-          
+                    <View style={styles.imageReorderRow}>
+                      <Pressable disabled={i === 0} onPress={() => handleMoveImage(i, 'left')}>
+                        <Text style={[styles.imageReorderText, i === 0 && styles.imageReorderTextDisabled]}>Left</Text>
+                      </Pressable>
+                      <Pressable disabled={i === images.length - 1} onPress={() => handleMoveImage(i, 'right')}>
+                        <Text style={[styles.imageReorderText, i === images.length - 1 && styles.imageReorderTextDisabled]}>Right</Text>
+                      </Pressable>
+                    </View>
                   </View>
-
-                  <View style={styles.imageReorderRow}>
-                    <Pressable disabled={i === 0} onPress={() => handleMoveImage(i, 'left')}>
-                      <Text style={[styles.imageReorderText, i === 0 && styles.imageReorderTextDisabled]}>Left</Text>
-                    </Pressable>
-                    <Pressable disabled={i === images.length - 1} onPress={() => handleMoveImage(i, 'right')}>
-                      <Text style={[styles.imageReorderText, i === images.length - 1 && styles.imageReorderTextDisabled]}>Right</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-
-<View style={styles.divider} />
-
-          {/* Content editor container with overlay */}
-          <View style={styles.contentEditorContainer}>
-            {/* Colored text display overlay */}
-            {content.trim() && (
-              <Pressable
-                onPress={() => contentRef.current?.focus()}
-                style={styles.coloredTextDisplay}
-                pointerEvents="box-none"
-              >
-                <Text style={styles.contentInput}>
-                  {renderColoredContent(content)}
-                </Text>
-              </Pressable>
+                ))}
+              </ScrollView>
             )}
 
-            <TextInput
-              ref={contentRef}
-              value={content}
-              style={[styles.contentInput, { color: content.trim() ? 'transparent' : GlassTheme.textPlaceholder }]}
-              placeholder="Start writing..."
-              placeholderTextColor={GlassTheme.textPlaceholder}
-              onChangeText={setContent}
-              onSelectionChange={(e) => {
-                selectionRef.current = e.nativeEvent.selection;
-                setSelection(e.nativeEvent.selection);
-              }}
-              selectionColor={GlassTheme.accentPrimary}
-              selection={selection}
-              multiline
-              textAlignVertical="top"
-              scrollEnabled={false}
-            />
-          </View>
+            <View style={styles.divider} />
 
-          <ChecklistEditor items={checklist} onChange={setChecklist} />
-        </Animated.View>
-      </ScrollView>
+            {/* Content editor container with overlay */}
+            <View style={styles.contentEditorContainer}>
+              {/* Colored text display overlay */}
+              {content.trim() && (
+                <Pressable
+                  onPress={() => contentRef.current?.focus()}
+                  style={styles.coloredTextDisplay}
+                  pointerEvents="box-none"
+                >
+                  <Text style={styles.contentInput}>
+                    {renderColoredContent(content)}
+                  </Text>
+                </Pressable>
+              )}
 
-      {/* Toolbar - fixed at bottom */}
-      <View style={styles.toolbarContainer}>
+              <TextInput
+                ref={contentRef}
+                value={content}
+                style={[styles.contentInput, { color: content.trim() ? 'transparent' : GlassTheme.textPlaceholder }]}
+                placeholder="Start writing..."
+                placeholderTextColor={GlassTheme.textPlaceholder}
+                onChangeText={setContent}
+                onSelectionChange={(e) => {
+                  selectionRef.current = e.nativeEvent.selection;
+                  setSelection(e.nativeEvent.selection);
+                }}
+                selectionColor={GlassTheme.accentPrimary}
+                selection={selection}
+                multiline
+                textAlignVertical="top"
+                scrollEnabled={false}
+              />
+            </View>
+
+            <ChecklistEditor items={checklist} onChange={setChecklist} />
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Toolbar - Fixed at bottom */}
+      <View style={[
+        styles.toolbarContainer,
+        { paddingBottom: Math.max(insets.bottom, 12) }
+      ]}>
         {/* List Type Picker - popover above toolbar */}
         <ListTypePicker
           visible={showListTypePicker}
@@ -756,7 +761,6 @@ export default function EditorScreen() {
           onAI={() => setShowAIEditor(true)}
         />
       </View>
-      </KeyboardAvoidingView>
 
       {/* Modals */}
       <Modal visible={showReminderSheet} transparent animationType="fade">
@@ -862,7 +866,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: GlassTheme.backgroundPrimary,
   },
-  container: {
+  keyboardAvoidingContainer: {
     flex: 1,
     backgroundColor: GlassTheme.backgroundPrimary,
     flexDirection: 'column',
@@ -872,6 +876,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: GlassTheme.spacing.md,
     paddingBottom: GlassTheme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: GlassTheme.glassBorder,
+    zIndex: 100,
   },
   headerButton: {
     width: 40,
@@ -900,12 +907,46 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
+  toastContainer: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    zIndex: 1000,
+  },
+  toastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+    backgroundColor: GlassTheme.glassBackground,
+  },
+  toastError: {
+    borderLeftWidth: 4,
+    borderLeftColor: GlassTheme.destructive,
+  },
+  toastTextContainer: {
+    flex: 1,
+  },
+  toastTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: GlassTheme.textPrimary,
+  },
+  toastMessage: {
+    fontSize: 12,
+    color: GlassTheme.textSecondary,
+    marginTop: 2,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: GlassTheme.spacing.lg,
-    paddingBottom: GlassTheme.spacing.xxl * 2,
+    paddingTop: GlassTheme.spacing.md,
   },
   titleInput: {
     fontSize: 28,
@@ -913,6 +954,51 @@ const styles = StyleSheet.create({
     color: GlassTheme.textPrimary,
     paddingVertical: GlassTheme.spacing.sm,
     letterSpacing: -0.3,
+  },
+  horizontalImageContainer: {
+    marginVertical: GlassTheme.spacing.md,
+  },
+  imageItemContainer: {
+    marginRight: GlassTheme.spacing.md,
+  },
+  largeImageWrapper: {
+    position: 'relative',
+    width: 200,
+    height: 140,
+    borderRadius: GlassTheme.radius.lg,
+    overflow: 'hidden',
+    backgroundColor: GlassTheme.backgroundElevated,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+  },
+  largeImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageActionBtn: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageReorderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 8,
+  },
+  imageReorderText: {
+    fontSize: 12,
+    color: GlassTheme.accentPrimary,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  imageReorderTextDisabled: {
+    color: GlassTheme.textTertiary,
+    opacity: 0.4,
   },
   divider: {
     height: 1,
@@ -942,14 +1028,14 @@ const styles = StyleSheet.create({
   },
   toolbarContainer: {
     position: 'absolute',
+    bottom: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    zIndex: 50,
-    elevation: 10,
     backgroundColor: GlassTheme.backgroundPrimary,
     borderTopWidth: 1,
     borderTopColor: GlassTheme.glassBorder,
+    zIndex: 50,
+    elevation: 10,
   },
   modalOverlay: {
     flex: 1,
@@ -1001,178 +1087,48 @@ const styles = StyleSheet.create({
     color: GlassTheme.destructive,
   },
   reminderCancel: {
-    marginTop: 4,
-    alignSelf: 'flex-end',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    borderRadius: GlassTheme.radius.md,
+    borderWidth: 1,
+    borderColor: GlassTheme.glassBorder,
+    paddingHorizontal: GlassTheme.spacing.md,
+    paddingVertical: GlassTheme.spacing.sm + 4,
+    alignItems: 'center',
+    marginTop: GlassTheme.spacing.sm,
+    backgroundColor: GlassTheme.backgroundElevated,
   },
   reminderCancelText: {
-    color: GlassTheme.textSecondary,
     fontSize: 14,
     fontWeight: '600',
-  },
-  imageGallery: {
-    maxHeight: 120,
-    marginBottom: GlassTheme.spacing.md,
-  },
-  horizontalImageContainer: {
-    flexDirection: 'row',
-    paddingVertical: GlassTheme.spacing.md,
-    gap: GlassTheme.spacing.sm,
-  },
-  imageItemContainer: {
-    width: 140,
-    position: 'relative',
-    marginRight: 10,
-  },
-  largeImageWrapper: {
-    width: 140,
-    height: 140,
-    borderRadius: GlassTheme.radius.md,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  largeImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imageActionBtn: {
-    position: 'absolute',
-    top: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    zIndex: 2,
-  },
-  imageActionSheet: {
-    position: 'absolute',
-    top: 56,
-    right: 54,
-    backgroundColor: GlassTheme.backgroundElevated,
-    borderRadius: GlassTheme.radius.md,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
-    padding: GlassTheme.spacing.xs,
-    width: 140,
-    zIndex: 10,
-    ...GlassTheme.shadowPrimary,
-  },
-  imageOptionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: GlassTheme.spacing.sm,
-    gap: GlassTheme.spacing.sm,
-  },
-  imageOptionText: {
-    color: GlassTheme.textPrimary,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  imageReorderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-  },
-  imageReorderText: {
     color: GlassTheme.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  imageReorderTextDisabled: {
-    opacity: 0.35,
-  },
-  toastContainer: {
-    position: 'absolute',
-    left: GlassTheme.spacing.lg,
-    right: GlassTheme.spacing.lg,
-    zIndex: 9999,
-  },
-  toastContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: GlassTheme.backgroundElevated,
-    borderRadius: GlassTheme.radius.lg,
-    padding: GlassTheme.spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.3)',
-    ...GlassTheme.shadowPrimary,
-  },
-  toastError: {
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-  },
-  toastTextContainer: {
-    marginLeft: GlassTheme.spacing.sm,
-    flex: 1,
-  },
-  toastTitle: {
-    color: GlassTheme.textPrimary,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  toastMessage: {
-    color: GlassTheme.textSecondary,
-    fontSize: 14,
-    marginTop: 2,
-  },
-  imageCard: {
-    width: 100,
-    height: 100,
-    borderRadius: GlassTheme.radius.xl,
-    marginRight: GlassTheme.spacing.sm,
-    backgroundColor: GlassTheme.glassBackground,
-    borderWidth: 1,
-    borderColor: GlassTheme.glassBorder,
-    overflow: 'hidden',
-    position: 'relative',
-    ...GlassTheme.shadowPrimary,
-  },
-  imageThumb: {
-    width: '100%',
-    height: '100%',
-    borderRadius: GlassTheme.radius.xl,
-  },
-  removeImageBtn: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
   previewContainer: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0,0,0,0.95)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   previewBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   previewImage: {
-    width: '100%',
+    width: '90%',
     height: '80%',
   },
   previewCloseBtn: {
     position: 'absolute',
-    top: 50,
-    right: 20,
+    top: 16,
+    right: 16,
     width: 44,
     height: 44,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 });
 
