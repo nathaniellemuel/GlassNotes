@@ -22,10 +22,12 @@
       },
       "package": "com.federent.glassnotes",
       "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET"
       ],
       "softwareKeyboardLayoutMode": "resize"
     },
@@ -67,7 +69,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "c6aa4b05-6b50-47d4-82c0-99650306ae8c"
+        "projectId": "d2ad84cd-60ee-4e1d-8fb1-9245448b945d"
       }
     }
   }

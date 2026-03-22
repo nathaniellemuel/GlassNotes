@@ -272,7 +272,7 @@ Just describe what you need. After I respond, you can apply changes directly to 
           'User-Agent': 'GlassNotes/1.0',
         },
         body: JSON.stringify({
-          model: 'openrouter/free',
+          model: 'openrouter/auto',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
