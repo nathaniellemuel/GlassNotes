@@ -262,17 +262,19 @@ Just describe what you need. After I respond, you can apply changes directly to 
         userContent = `My note: "${currentNoteContent}"\n\nMy question: ${text}`;
       }
 
+      console.log('[API] OpenRouter API Key exists:', !!apiKey);
+      console.log('[API] Sending request to OpenRouter...');
+
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': 'https://glassnotes.app',
-          'X-Title': 'GlassNotes',
-          'User-Agent': 'GlassNotes/1.0',
+          'X-Title': 'Glass Notes AI Assistant',
         },
         body: JSON.stringify({
-          model: 'openrouter/auto',
+          model: 'openrouter/free',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
@@ -282,14 +284,26 @@ Just describe what you need. After I respond, you can apply changes directly to 
         }),
       });
 
+      console.log('[API] Response status:', response.status);
+
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}`;
         try {
           const errorData = await response.json();
           errorMessage = errorData.error?.message || errorData.error || JSON.stringify(errorData);
+          console.log('[API] Error response:', errorData);
         } catch (e) {
           const textError = await response.text();
           errorMessage = textError || errorMessage;
+        }
+        console.log('[API] Final error message:', errorMessage);
+
+        // Better error messages for user
+        if (response.status === 401) {
+          return { success: false, error: 'API key is invalid or expired. Please check your OpenRouter configuration.' };
+        }
+        if (response.status === 429) {
+          return { success: false, error: 'Rate limited. Please wait a moment and try again.' };
         }
         return { success: false, error: errorMessage };
       }
