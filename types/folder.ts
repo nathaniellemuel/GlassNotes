@@ -4,4 +4,5 @@ export interface Folder {
   parentId?: string;
   createdAt: number;
   updatedAt: number;
+  password?: string;
 }

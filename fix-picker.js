@@ -1,4 +1,5 @@
-import React from 'react';
+const fs = require('fs');
+const content = `import React from 'react';
 import { StyleSheet, Pressable, View, Text, Animated, Modal } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
     gap: GlassTheme.spacing.sm,
   },
   optionActive: {
-    backgroundColor: `${GlassTheme.accentPrimary}15`,
+    backgroundColor: \`\${GlassTheme.accentPrimary}15\`,
   },
   optionLabel: {
     fontSize: 13,
@@ -189,3 +190,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+`;
+
+fs.writeFileSync('components/list-type-picker.tsx', content);
+console.log('Fixed list type picker');

@@ -12,7 +12,7 @@ export interface AIProcessResult {
   error?: string;
 }
 
-export type AIAction = 'summarize' | 'translate' | 'grammar' | 'improve';
+export type AIAction = 'summarize' | 'translate' | 'grammar' | 'improve' | 'todo';
 
 const SYSTEM_PROMPTS: Record<AIAction, string> = {
   summarize: `You are a note-taking assistant. Your task is to summarize the provided text concisely while preserving key information.
@@ -29,6 +29,13 @@ Return only the corrected text without any additional explanation.`,
   improve: `You are a note-taking assistant. Your task is to improve the clarity, readability, and tone of the provided text.
 Make it more engaging and professional while keeping the original meaning.
 Return only the improved text without any additional explanation.`,
+
+  todo: `You are a smart assistant. Your task is to generate a to-do list based on the user's prompt. 
+Format the output EXACTLY as a JSON array of objects with the following keys:
+- "title": a short task title (string)
+- "description": brief details (string)
+- "priority": one of "low", "medium", "high"
+Do NOT wrap the response in markdown code blocks. Output ONLY valid JSON.`,
 };
 
 /**

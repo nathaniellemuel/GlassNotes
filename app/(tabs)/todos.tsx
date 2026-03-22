@@ -19,6 +19,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import { GlassTheme } from '@/constants/theme';
 import { useTodos } from '@/hooks/use-todos';
 import { TodoItem } from '@/components/todo-item';
@@ -26,6 +27,7 @@ import { TODO_PRIORITIES } from '@/types/todo';
 import type { Todo, TodoPriority } from '@/types/todo';
 import { generateId } from '@/utils/id';
 import { requestPermissions } from '@/hooks/use-notifications';
+import { processWithAI } from '@/utils/ai-client';
 
 type FilterType = 'all' | 'active' | 'completed';
 
@@ -50,6 +52,11 @@ export default function TodosScreen() {
   const [formPriority, setFormPriority] = useState<TodoPriority>('medium');
   const [formDueDate, setFormDueDate] = useState('');
   const [formReminder, setFormReminder] = useState('');
+
+  // AI Modal state
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -116,6 +123,74 @@ export default function TodosScreen() {
     await saveTodo(todo);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowModal(false);
+  };
+
+  const handleGenerateAI = async () => {
+    if (!aiPrompt.trim()) {
+      Alert.alert('Please describe the task list you want to generate.');
+      return;
+    }
+
+    setIsProcessingAI(true);
+    try {
+      const result = await processWithAI(aiPrompt, 'todo');
+      if (result.success && result.data) {
+        let tasks = [];
+        try {
+          // Attempt to parse the response inside the result
+          let rawData = result.data;
+          
+          // Sometimes LLMs wrap json inside ```json ... ``` blocks even if instructed not to.
+          // Try to clean it gently if needed:
+          rawData = rawData.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+          tasks = JSON.parse(rawData);
+          if (!Array.isArray(tasks)) {
+            tasks = [tasks]; // just in case it returns a single object
+          }
+        } catch (err) {
+          console.error("Failed to parse AI output:", result.data);
+          Alert.alert('Error', 'Failed to read the generated tasks. Please try again.');
+          setIsProcessingAI(false);
+          return;
+        }
+
+        // Save each task
+        for (const task of tasks) {
+          if (!task.title) continue;
+          
+          let priority = 'medium';
+          if (['low', 'medium', 'high'].includes(task.priority?.toLowerCase())) {
+            priority = task.priority.toLowerCase();
+          }
+
+          const todo: Todo = {
+            id: generateId(),
+            title: task.title.trim(),
+            description: task.description?.trim() || '',
+            completed: false,
+            priority: priority as TodoPriority,
+            colorId: 'default',
+            dueDate: undefined,
+            reminderAt: undefined,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          await saveTodo(todo);
+        }
+
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setAiPrompt('');
+        setShowAIModal(false);
+      } else {
+        Alert.alert('AI Error', result.error || 'Failed to generate tasks.');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setIsProcessingAI(false);
+    }
   };
 
   const handleLongPress = (todo: Todo) => {
@@ -202,6 +277,20 @@ export default function TodosScreen() {
         showsVerticalScrollIndicator={false}
       />
 
+      {/* AI Generate FAB */}
+      <Pressable
+        onPress={() => setShowAIModal(true)}
+        style={[styles.fab, { bottom: insets.bottom + 154, backgroundColor: 'transparent' }]}
+      >
+        <View style={{ flex: 1, borderRadius: 25, overflow: 'hidden' }}>
+          <BlurView intensity={40} tint="dark" style={styles.fabBlur}>
+            <View style={styles.aiFabInner}>
+              <MaterialIcons name="auto-awesome" size={24} color={GlassTheme.accentPrimary} />
+            </View>
+          </BlurView>
+        </View>
+      </Pressable>
+
       {/* FAB */}
       <Pressable
         onPress={openCreateModal}
@@ -216,6 +305,55 @@ export default function TodosScreen() {
           <MaterialIcons name="add" size={24} color={GlassTheme.accentText} />
         </LinearGradient>
       </Pressable>
+
+      {/* AI Generate Modal */}
+      <Modal visible={showAIModal} animationType="slide" transparent presentationStyle="overFullScreen">
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => !isProcessingAI && setShowAIModal(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <MaterialIcons name="auto-awesome" size={24} color={GlassTheme.accentPrimary} />
+                <Text style={[styles.modalTitle, { marginBottom: 0 }]}>Smart To-Do (AI)</Text>
+              </View>
+
+              <Text style={styles.fieldLabel}>What needs to be done?</Text>
+              <TextInput
+                style={[styles.textInput, styles.textInputMulti]}
+                placeholder="E.g., Plan a 3-day trip to Bali, clean the house, or prepare for the math exam"
+                placeholderTextColor={GlassTheme.textPlaceholder}
+                value={aiPrompt}
+                onChangeText={setAiPrompt}
+                selectionColor={GlassTheme.accentPrimary}
+                multiline
+                numberOfLines={4}
+                editable={!isProcessingAI}
+                autoFocus
+              />
+
+              <View style={styles.modalActions}>
+                <Pressable onPress={() => setShowAIModal(false)} style={styles.cancelBtn} disabled={isProcessingAI}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </Pressable>
+                <Pressable onPress={handleGenerateAI} style={[styles.saveBtn, isProcessingAI && { opacity: 0.6 }]} disabled={isProcessingAI}>
+                  <LinearGradient
+                    colors={[GlassTheme.accentPrimary, GlassTheme.accentSecondary]}
+                    style={styles.saveBtnGradient}
+                  >
+                    <Text style={styles.saveBtnText}>
+                      {isProcessingAI ? 'Generating...' : 'Generate Magic'}
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Create/Edit Modal */}
       <Modal visible={showModal} animationType="slide" transparent presentationStyle="overFullScreen">
@@ -422,6 +560,23 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     ...GlassTheme.shadowPrimary,
+  },
+  fabBlur: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 25,
+  },
+  aiFabInner: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.4)',
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
   },
   fabGradient: {
     width: 50,

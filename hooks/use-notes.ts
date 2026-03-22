@@ -80,6 +80,16 @@ export function useNotes() {
     });
   }, []);
 
+  const setNotePassword = useCallback((noteId: string, password?: string) => {
+    setNotes((prev) => {
+      const updated = prev.map((n) =>
+        n.id === noteId ? { ...n, password: password || undefined, updatedAt: Date.now() } : n,
+      );
+      storage.set(STORAGE_KEY, updated);
+      return updated;
+    });
+  }, []);
+
   const filteredNotes: NotePreview[] = notes
     .filter((n) => {
       if (!searchQuery) return true;
@@ -101,10 +111,11 @@ export function useNotes() {
       isPinned: n.isPinned,
       colorId: n.colorId ?? 'default',
       folderId: n.folderId,
-      preview: stripFormatting(n.content).slice(0, 100),
+      preview: n.password ? 'Locked note' : stripFormatting(n.content).slice(0, 100),
       checklistTotal: n.checklist.length,
       checklistDone: n.checklist.filter((c) => c.checked).length,
       wordCount: countWords(n.content),
+      password: n.password,
     }));
 
   return {
@@ -117,6 +128,7 @@ export function useNotes() {
     deleteNote,
     togglePin,
     moveToFolder,
+    setNotePassword,
     getNote,
     loadNotes,
   };

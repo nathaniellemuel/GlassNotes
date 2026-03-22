@@ -31,9 +31,10 @@ export interface Note {
   images?: string[];
   type?: 'note' | 'pdf' | 'image' | 'video';
   fileUri?: string;
+  password?: string;
 }
 
-export type NotePreview = Pick<Note, 'id' | 'title' | 'updatedAt' | 'isPinned' | 'colorId' | 'folderId' | 'type' | 'fileUri'> & {
+export type NotePreview = Pick<Note, 'id' | 'title' | 'updatedAt' | 'isPinned' | 'colorId' | 'folderId' | 'type' | 'fileUri' | 'password'> & {
   preview: string;
   checklistTotal: number;
   checklistDone: number;

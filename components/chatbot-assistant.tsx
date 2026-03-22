@@ -30,8 +30,10 @@ interface Message {
 
 interface ChatBotProps {
   onClose?: () => void;
-  onUpdateNote?: (text: string, action: 'append' | 'replace' | 'prepend') => void;
+  onUpdateNote?: (text: string, action: 'append' | 'replace' | 'prepend' | 'set-title') => void;
+  onUpdateTitle?: (title: string) => void;
   currentNoteContent?: string;
+  title?: string;
 }
 
 const LANGUAGE_OPTIONS = [
@@ -60,9 +62,10 @@ const CRUD_ACTIONS = [
   { id: 'append', label: 'Add to Note', icon: 'add-box' },
   { id: 'replace', label: 'Replace Note', icon: 'edit' },
   { id: 'prepend', label: 'Insert at Top', icon: 'vertical-align-top' },
+  { id: 'set-title', label: 'Set as Title', icon: 'title' },
 ] as const;
 
-const AI_SYSTEM_PROMPT = `You are Glassy AI, a friendly writing assistant for a note-taking app. Help users with their note content.
+const AI_SYSTEM_PROMPT = `You are Glassy AI, a friendly writing assistant for a note-taking app. Help users with their note content and titles.
 
 ALLOWED:
 - Summarize text
@@ -70,6 +73,7 @@ ALLOWED:
 - Fix grammar and spelling
 - Improve writing clarity
 - Reformat into bullet points
+- Propose titles
 - Answer questions about note content
 
 DO NOT:
@@ -80,7 +84,7 @@ DO NOT:
 
 Always be concise. Respond in the user's language unless translating.`;
 
-export function ChatBotAssistant({ onClose, onUpdateNote, currentNoteContent }: ChatBotProps) {
+export function ChatBotAssistant({ onClose, onUpdateNote, onUpdateTitle, currentNoteContent, title }: ChatBotProps) {
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -175,7 +179,8 @@ Just describe what you need. After I respond, you can apply changes directly to 
       return;
     }
 
-    if (!currentNoteContent) {
+    const noteRequiredActions = ['summarize', 'grammar', 'improve', 'translate'];
+    if (noteRequiredActions.includes(action || '') && !currentNoteContent) {
       setToast({ title: 'No Note Content', message: 'Add text to your note first', type: 'error' });
       return;
     }
@@ -222,15 +227,20 @@ Just describe what you need. After I respond, you can apply changes directly to 
     }
   };
 
-  const saveToNote = (messageId: string, action: 'append' | 'replace' | 'prepend') => {
+  const saveToNote = (messageId: string, action: 'append' | 'replace' | 'prepend' | 'set-title') => {
     const message = messages.find(m => m.id === messageId);
     if (message?.role === 'assistant') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Clean markdown before saving
       const cleanedContent = cleanMarkdownResponse(message.content);
-      onUpdateNote?.(cleanedContent, action);
-      const actionText = action === 'append' ? 'added' : action === 'replace' ? 'replaced' : 'inserted';
-      setToast({ title: '✓ Saved', message: `Response ${actionText} to note!`, type: 'success' });
+      if (action === 'set-title' && onUpdateTitle) {
+        onUpdateTitle(cleanedContent);
+        setToast({ title: '✓ Saved', message: 'Title updated successfully!', type: 'success' });
+      } else {
+        onUpdateNote?.(cleanedContent, action);
+        const actionText = action === 'append' ? 'added' : action === 'replace' ? 'replaced' : 'inserted';
+        setToast({ title: '✓ Saved', message: `Response ${actionText} to note!`, type: 'success' });
+      }
     }
   };
 
@@ -261,7 +271,9 @@ Just describe what you need. After I respond, you can apply changes directly to 
         userContent = `Improve:\n\n${currentNoteContent}`;
       } else {
         // General chat with note context
-        userContent = `My note: "${currentNoteContent}"\n\nMy question: ${text}`;
+        const contextText = currentNoteContent ? `My note: "${currentNoteContent}"\n\n` : '';
+        const titleText = title ? `Current title: "${title}"\n\n` : '';
+        userContent = `${titleText}${contextText}My question: ${text}`;
       }
 
       console.log('[API] OpenRouter API Key exists:', !!apiKey);
@@ -276,7 +288,7 @@ Just describe what you need. After I respond, you can apply changes directly to 
           'X-Title': 'Glass Notes AI Assistant',
         },
         body: JSON.stringify({
-          model: 'openrouter/free',
+          model: 'openrouter/auto',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
@@ -329,7 +341,7 @@ Just describe what you need. After I respond, you can apply changes directly to 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       {toast && (
@@ -407,49 +419,51 @@ Just describe what you need. After I respond, you can apply changes directly to 
       </ScrollView>
 
       {!isLoading && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.actionsContainer}
-          contentContainerStyle={styles.actionsContent}
-        >
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => sendMessage(undefined, 'summarize')}
+        <View style={[styles.actionsContainer, { flexShrink: 0 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.actionsContent}
+            keyboardShouldPersistTaps="always"
           >
-            <MaterialIcons name="summarize" size={16} color={GlassTheme.accentPrimary} />
-            <Text style={styles.actionLabel}>Summarize</Text>
-          </Pressable>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => sendMessage(undefined, 'summarize')}
+            >
+              <MaterialIcons name="summarize" size={16} color={GlassTheme.accentPrimary} />
+              <Text style={styles.actionLabel}>Summarize</Text>
+            </Pressable>
 
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => setShowLanguagePicker(true)}
-          >
-            <MaterialIcons name="translate" size={16} color={GlassTheme.accentPrimary} />
-            <Text style={styles.actionLabel}>Translate</Text>
-          </Pressable>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => setShowLanguagePicker(true)}
+            >
+              <MaterialIcons name="translate" size={16} color={GlassTheme.accentPrimary} />
+              <Text style={styles.actionLabel}>Translate</Text>
+            </Pressable>
 
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => sendMessage(undefined, 'grammar')}
-          >
-            <MaterialIcons name="spellcheck" size={16} color={GlassTheme.accentPrimary} />
-            <Text style={styles.actionLabel}>Fix Grammar</Text>
-          </Pressable>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => sendMessage(undefined, 'grammar')}
+            >
+              <MaterialIcons name="spellcheck" size={16} color={GlassTheme.accentPrimary} />
+              <Text style={styles.actionLabel}>Fix Grammar</Text>
+            </Pressable>
 
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => sendMessage(undefined, 'improve')}
-          >
-            <MaterialIcons name="auto-fix-high" size={16} color={GlassTheme.accentPrimary} />
-            <Text style={styles.actionLabel}>Improve</Text>
-          </Pressable>
-        </ScrollView>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() => sendMessage(undefined, 'improve')}
+            >
+              <MaterialIcons name="auto-fix-high" size={16} color={GlassTheme.accentPrimary} />
+              <Text style={styles.actionLabel}>Improve</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
       )}
 
       <BlurView intensity={50} tint="dark" style={[
         styles.inputContainer,
-        { paddingBottom: Math.max(insets.bottom, 12) + 8 }
+        { paddingBottom: keyboardHeight > 0 ? 12 : Math.max(insets.bottom, 12), flexShrink: 0 }
       ]}>
         <View style={styles.inputRow}>
           <TextInput
@@ -602,18 +616,14 @@ const styles = StyleSheet.create({
     color: GlassTheme.accentPrimary,
   },
   actionsContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: GlassTheme.glassBorder,
-    flexGrow: 0,
-    flexShrink: 0,
-    maxHeight: 60,
+    height: 56,
   },
   actionsContent: {
     gap: 8,
     alignItems: 'center',
-    paddingRight: 24,
+    paddingHorizontal: 12,
   },
   actionButton: {
     flexDirection: 'row',

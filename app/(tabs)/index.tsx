@@ -80,13 +80,19 @@ export default function NotesListScreen() {
     deleteNote,
     togglePin,
     moveToFolder,
+    setNotePassword,
     loadNotes,
     saveNote,
   } = useNotes();
-  const { folders, loadFolders, createFolder, renameFolder, deleteFolder, moveFolder } = useFolders();
+  const { folders, loadFolders, createFolder, renameFolder, deleteFolder, moveFolder, setFolderPassword } = useFolders();
 
   const [currentFolderId, setCurrentFolderId] = useState<string | undefined>(undefined);
   const [showFolderModal, setShowFolderModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [folderPassword, setFolderPasswordInput] = useState('');
+  const [targetUnlockFolder, setTargetUnlockFolder] = useState<Folder | null>(null);
+  const [targetUnlockNote, setTargetUnlockNote] = useState<NotePreview | null>(null);
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -367,8 +373,14 @@ export default function NotesListScreen() {
     } catch (e) { console.warn(e); }
   };
 
-  const handleNotePress = (id: string) => {
-    router.push({ pathname: '/editor', params: { id } });
+  const handleNotePress = (note: NotePreview) => {
+    if (note.password) {
+      setTargetUnlockNote(note);
+      setFolderPasswordInput('');
+      setShowUnlockModal(true);
+    } else {
+      router.push({ pathname: '/editor', params: { id: note.id } });
+    }
   };
 
   const handleNoteLongPress = (note: NotePreview, event: any) => {
@@ -397,7 +409,31 @@ export default function NotesListScreen() {
 
   const handleOpenFolder = (folder: Folder) => {
     if (draggingItem) return;
-    setCurrentFolderId(folder.id);
+    if (folder.password) {
+      setTargetUnlockFolder(folder);
+      setFolderPasswordInput('');
+      setShowUnlockModal(true);
+    } else {
+      setCurrentFolderId(folder.id);
+    }
+  };
+
+  const handleUnlockFolder = () => {
+    if (targetUnlockFolder) {
+      if (targetUnlockFolder.password === folderPassword) {
+        setShowUnlockModal(false);
+        setTimeout(() => setCurrentFolderId(targetUnlockFolder.id), 100);
+      } else {
+        Alert.alert('Incorrect Password', 'The password you entered is incorrect.');
+      }
+    } else if (targetUnlockNote) {
+      if (targetUnlockNote.password === folderPassword) {
+        setShowUnlockModal(false);
+        setTimeout(() => router.push({ pathname: '/editor', params: { id: targetUnlockNote.id } }), 100);
+      } else {
+        Alert.alert('Incorrect Password', 'The password you entered is incorrect.');
+      }
+    }
   };
 
   const handleGoUp = () => {
@@ -610,6 +646,9 @@ export default function NotesListScreen() {
                           <Text style={styles.explorerFolderName} numberOfLines={2}>
                             {item.folder.name}
                           </Text>
+                          {item.folder.password && (
+                            <MaterialIcons name="lock" size={12} color={GlassTheme.textSecondary} style={{ marginTop: 2 }} />
+                          )}
                         </View>
                       </View>
                       <View style={styles.folderRowActions}>
@@ -634,7 +673,7 @@ export default function NotesListScreen() {
                 width={cardWidth}
                 onPress={() => {
                   if (draggingItem) return;
-                  handleNotePress(item.note.id);
+                  handleNotePress(item.note);
                 }}
                 onLongPress={(event) => handleNoteLongPress(item.note, event)}
                 onItemTouchMove={(event) => {
@@ -715,6 +754,100 @@ export default function NotesListScreen() {
         </Pressable>
       </Modal>
 
+      <Modal visible={showPasswordModal} transparent animationType="fade">
+        <Pressable
+          style={[
+            styles.modalOverlay,
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+          ]}
+          onPress={() => setShowPasswordModal(false)}
+        >
+          <View style={[styles.modalSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>Set Password</Text>
+            <Text style={{ color: GlassTheme.textSecondary, marginBottom: 12, fontSize: 13 }}>
+              Leave blank to remove password.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter password..."
+              placeholderTextColor={GlassTheme.textPlaceholder}
+              value={folderPassword}
+              onChangeText={setFolderPasswordInput}
+              selectionColor={GlassTheme.accentPrimary}
+              secureTextEntry
+              autoFocus
+              onSubmitEditing={() => {
+                if (itemMenu?.type === 'folder' && editingFolderId) {
+                  setFolderPassword(editingFolderId, folderPassword);
+                } else if (itemMenu?.type === 'note') {
+                  setNotePassword(itemMenu.note.id, folderPassword);
+                }
+                setShowPasswordModal(false);
+                setEditingFolderId(null);
+                setFolderPasswordInput('');
+              }}
+            />
+            <View style={styles.modalActions}>
+              <Pressable onPress={() => { setShowPasswordModal(false); setItemMenu(null); }} style={styles.modalCancel}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable 
+                onPress={() => {
+                  if (itemMenu?.type === 'folder' && editingFolderId) {
+                    setFolderPassword(editingFolderId, folderPassword);
+                  } else if (itemMenu?.type === 'note') {
+                    setNotePassword(itemMenu.note.id, folderPassword);
+                  }
+                  setShowPasswordModal(false);
+                  setEditingFolderId(null);
+                  setFolderPasswordInput('');
+                  setItemMenu(null);
+                }} 
+                style={[styles.modalSave, { backgroundColor: GlassTheme.accentPrimary }]}
+              >
+                <Text style={[styles.modalSaveText, { color: GlassTheme.accentText }]}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={showUnlockModal} transparent animationType="fade">
+        <Pressable
+          style={[
+            styles.modalOverlay,
+            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+          ]}
+          onPress={() => setShowUnlockModal(false)}
+        >
+          <View style={[styles.modalSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>Unlock Item</Text>
+            <Text style={{ color: GlassTheme.textSecondary, marginBottom: 12, fontSize: 13 }}>
+              This item is protected. Enter password to view contents.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Password"
+              placeholderTextColor={GlassTheme.textPlaceholder}
+              value={folderPassword}
+              onChangeText={setFolderPasswordInput}
+              selectionColor={GlassTheme.accentPrimary}
+              secureTextEntry
+              autoFocus
+              onSubmitEditing={handleUnlockFolder}
+            />
+            <View style={styles.modalActions}>
+              <Pressable onPress={() => { setShowUnlockModal(false); setTargetUnlockNote(null); setTargetUnlockFolder(null); }} style={styles.modalCancel}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={handleUnlockFolder} style={[styles.modalSave, { backgroundColor: GlassTheme.accentPrimary }]}>
+                <Text style={[styles.modalSaveText, { color: GlassTheme.accentText }]}>Unlock</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
       <Modal visible={showUploadSheet} transparent animationType="fade">
         <Pressable style={[styles.modalOverlay, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]} onPress={() => setShowUploadSheet(false)}>
           <View style={[styles.actionSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
@@ -769,6 +902,17 @@ export default function NotesListScreen() {
                 <Pressable
                   style={styles.actionSheetButton}
                   onPress={() => {
+                    setFolderPasswordInput(itemMenu.note.password || '');
+                    setShowPasswordModal(true);
+                    // intentionally not setting itemMenu to null here so modal knows which item to update
+                  }}
+                >
+                  <MaterialIcons name={itemMenu.note.password ? "lock-open" : "lock"} size={16} color={GlassTheme.textSecondary} />
+                  <Text style={styles.actionSheetText}>{itemMenu.note.password ? 'Remove password' : 'Set password'}</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionSheetButton}
+                  onPress={() => {
                     setDraggingItem({
                       type: 'note',
                       note: itemMenu.note,
@@ -815,6 +959,17 @@ export default function NotesListScreen() {
                 >
                   <MaterialIcons name="edit" size={16} color={GlassTheme.textSecondary} />
                   <Text style={styles.actionSheetText}>Rename folder</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionSheetButton}
+                  onPress={() => {
+                    setEditingFolderId(itemMenu.folder.id);
+                    setFolderPasswordInput(itemMenu.folder.password || '');
+                    setShowPasswordModal(true);
+                  }}
+                >
+                  <MaterialIcons name={itemMenu.folder.password ? "lock-open" : "lock"} size={16} color={GlassTheme.textSecondary} />
+                  <Text style={styles.actionSheetText}>{itemMenu.folder.password ? 'Remove password' : 'Set password'}</Text>
                 </Pressable>
                 <Pressable
                   style={styles.actionSheetButton}

@@ -49,6 +49,16 @@ export function useFolders() {
     });
   }, []);
 
+  const setFolderPassword = useCallback((id: string, password?: string) => {
+    setFolders((prev) => {
+      const updated = prev.map((f) =>
+        f.id === id ? { ...f, password: password || undefined, updatedAt: Date.now() } : f,
+      );
+      storage.set(STORAGE_KEY, updated);
+      return updated;
+    });
+  }, []);
+
   const deleteFolder = useCallback((id: string) => {
     setFolders((prev) => {
       const childrenMap = new Map<string, string[]>();
@@ -120,6 +130,7 @@ export function useFolders() {
     loadFolders,
     createFolder,
     renameFolder,
+    setFolderPassword,
     deleteFolder,
     moveFolder,
   };

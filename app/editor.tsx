@@ -7,12 +7,12 @@ import {
   Pressable,
   ScrollView,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   Keyboard,
   Modal,
   Image,
   AppState,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -540,8 +540,7 @@ export default function EditorScreen() {
   
   // Extra space when keyboard is open to prevent sticking to prediction bars
   const extraPadding = Platform.OS === 'ios' && isKeyboardOpen ? 16 : 0;
-  const toolbarPaddingBottom = Math.max(insets.bottom, GlassTheme.spacing.md) + extraPadding;
-
+  
   return (
     <View style={styles.screenContainer}>
       {/* Header with proper top inset */}
@@ -624,16 +623,15 @@ export default function EditorScreen() {
         <ColorPicker selected={colorId} onSelect={(id) => { setColorId(id); setShowColorPicker(false); }} />
       )}
 
-      <KeyboardAvoidingView
+      <View
         style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {/* Editor content */}
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: 100 + Math.max(insets.bottom, 12) }
+            { paddingBottom: 120 + Math.max(insets.bottom, 24) }
           ]}
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
@@ -726,40 +724,55 @@ export default function EditorScreen() {
             <ChecklistEditor items={checklist} onChange={setChecklist} />
           </Animated.View>
         </ScrollView>
-      </KeyboardAvoidingView>
 
-      {/* Toolbar - Fixed at bottom */}
-      <View style={[
-        styles.toolbarContainer,
-        { paddingBottom: Math.max(insets.bottom, 12) }
-      ]}>
-        {/* List Type Picker - popover above toolbar */}
-        <ListTypePicker
-          visible={showListTypePicker}
-          currentType={listType}
-          onSelect={handleListTypeChange}
-          onClose={() => setShowListTypePicker(false)}
-        />
+        {/* Fixed Toolbar */}
+        <Animated.View style={{ 
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: GlassTheme.backgroundPrimary,
+          borderTopWidth: 1,
+          borderTopColor: GlassTheme.border,
+          zIndex: 50,
+          elevation: 10,
+        }}>
+          <View style={[
+            styles.toolbarContainer,
+            { 
+              paddingBottom: isKeyboardOpen ? (Platform.OS === 'ios' ? 12 : 24) : Math.max(insets.bottom, 24),
+              paddingTop: 12,
+            }
+          ]}>
+            {/* List Type Picker - popover above toolbar */}
+            <ListTypePicker
+              visible={showListTypePicker}
+              currentType={listType}
+              onSelect={handleListTypeChange}
+              onClose={() => setShowListTypePicker(false)}
+            />
 
-        {showTextColorPicker && (
-          <View style={{ paddingHorizontal: GlassTheme.spacing.md }}>
-            <TextColorPicker
-              onSelect={handleApplyTextColor}
-              onClose={() => setShowTextColorPicker(false)}
+            {showTextColorPicker && (
+              <View style={{ paddingHorizontal: GlassTheme.spacing.md }}>
+                <TextColorPicker
+                  onSelect={handleApplyTextColor}
+                  onClose={() => setShowTextColorPicker(false)}
+                />
+              </View>
+            )}
+            <FormattingToolbar
+              onBold={handleBold}
+              onItalic={handleItalic}
+              onUppercase={handleUppercase}
+              onBullet={handleBullet}
+              onBulletLongPress={() => setShowListTypePicker(true)}
+              onChecklist={handleChecklist}
+              onPhoto={handleInsertPhoto}
+              onTextColor={handleTextColor}
+              onAI={() => setShowAIEditor(true)}
             />
           </View>
-        )}
-        <FormattingToolbar
-          onBold={handleBold}
-          onItalic={handleItalic}
-          onUppercase={handleUppercase}
-          onBullet={handleBullet}
-          onBulletLongPress={() => setShowListTypePicker(true)}
-          onChecklist={handleChecklist}
-          onPhoto={handleInsertPhoto}
-          onTextColor={handleTextColor}
-          onAI={() => setShowAIEditor(true)}
-        />
+        </Animated.View>
       </View>
 
       {/* Modals */}
@@ -852,6 +865,8 @@ export default function EditorScreen() {
           <Modal visible={true} transparent={false} animationType="slide">
             <ChatBotAssistant
               currentNoteContent={content}
+              title={title}
+              onUpdateTitle={setTitle}
               onUpdateNote={handleAIUpdateNote}
               onClose={() => setShowAIEditor(false)}
             />
@@ -1027,14 +1042,13 @@ const styles = StyleSheet.create({
     paddingRight: 0,
   },
   toolbarContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: GlassTheme.backgroundPrimary,
     borderTopWidth: 1,
     borderTopColor: GlassTheme.glassBorder,
-    zIndex: 50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
     elevation: 10,
   },
   modalOverlay: {

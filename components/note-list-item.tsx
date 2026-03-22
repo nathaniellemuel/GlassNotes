@@ -93,9 +93,14 @@ export function NoteListItem({
             <View style={styles.header}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                 <MaterialIcons name="description" size={18} color="rgba(255, 255, 255, 0.9)" />
-                <Text style={styles.title} numberOfLines={2}>
-                  {note.title || 'Untitled'}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title} numberOfLines={2}>
+                    {note.title || 'Untitled'}
+                  </Text>
+                  {note.password && (
+                    <MaterialIcons name="lock" size={12} color={GlassTheme.textSecondary} style={{ marginTop: 2 }} />
+                  )}
+                </View>
               </View>
               <View style={styles.headerActions}>
                 {note.isPinned && (
