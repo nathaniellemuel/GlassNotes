@@ -623,8 +623,9 @@ export default function EditorScreen() {
         <ColorPicker selected={colorId} onSelect={(id) => { setColorId(id); setShowColorPicker(false); }} />
       )}
 
-      <View
+      <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {/* Editor content */}
         <ScrollView
@@ -740,7 +741,7 @@ export default function EditorScreen() {
           <View style={[
             styles.toolbarContainer,
             { 
-              paddingBottom: isKeyboardOpen ? (Platform.OS === 'ios' ? 12 : 24) : Math.max(insets.bottom, 24),
+              paddingBottom: isKeyboardOpen ? 12 : Math.max(insets.bottom, 24),
               paddingTop: 12,
             }
           ]}>
@@ -773,7 +774,7 @@ export default function EditorScreen() {
             />
           </View>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
 
       {/* Modals */}
       <Modal visible={showReminderSheet} transparent animationType="fade">

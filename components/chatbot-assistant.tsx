@@ -342,7 +342,6 @@ Just describe what you need. After I respond, you can apply changes directly to 
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       {toast && (
         <GlassToast
