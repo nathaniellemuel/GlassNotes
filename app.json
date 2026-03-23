@@ -4,11 +4,11 @@
     "slug": "glass-notes",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.jpeg",
+    "icon": "./assets/icon.png",
     "scheme": "glassnotes",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/logo.jpeg",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#050505"
     },
@@ -19,7 +19,7 @@
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#050505",
-        "foregroundImage": "./assets/logo.jpeg"
+        "foregroundImage": "./assets/icon.png"
       },
       "package": "com.federent.glassnotes",
       "permissions": [
@@ -29,18 +29,17 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO",
         "android.permission.INTERNET"
-      ],
-      "softwareKeyboardLayoutMode": "resize"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/logo.jpeg",
+          "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#050505"
@@ -49,7 +48,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/logo.jpeg",
+          "icon": "./assets/icon.png",
           "color": "#8B5CF6"
         }
       ],
@@ -62,7 +61,8 @@
       ],
       [
         "expo-file-system"
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

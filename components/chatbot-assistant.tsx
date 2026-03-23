@@ -341,7 +341,7 @@ Just describe what you need. After I respond, you can apply changes directly to 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, 12) : 0}
     >
       {toast && (

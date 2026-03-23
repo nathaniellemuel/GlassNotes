@@ -9,9 +9,10 @@ import type { ChecklistItem } from '@/types/note';
 type ChecklistEditorProps = {
   items: ChecklistItem[];
   onChange: (items: ChecklistItem[]) => void;
+  onInputFocus?: () => void;
 };
 
-export function ChecklistEditor({ items, onChange }: ChecklistEditorProps) {
+export function ChecklistEditor({ items, onChange, onInputFocus }: ChecklistEditorProps) {
   const toggleItem = (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onChange(items.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i)));
@@ -67,6 +68,7 @@ export function ChecklistEditor({ items, onChange }: ChecklistEditorProps) {
             style={[styles.input, item.checked && styles.inputChecked]}
             value={item.text}
             onChangeText={(text) => updateText(item.id, text)}
+            onFocus={onInputFocus}
             placeholder="Todo item..."
             placeholderTextColor={GlassTheme.textPlaceholder}
             selectionColor={GlassTheme.accentPrimary}

@@ -310,7 +310,7 @@ export default function TodosScreen() {
       <Modal visible={showAIModal} animationType="slide" transparent presentationStyle="overFullScreen">
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <Pressable style={styles.modalBackdrop} onPress={() => !isProcessingAI && setShowAIModal(false)} />
@@ -360,7 +360,7 @@ export default function TodosScreen() {
       <Modal visible={showModal} animationType="slide" transparent presentationStyle="overFullScreen">
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <Pressable style={styles.modalBackdrop} onPress={() => setShowModal(false)} />

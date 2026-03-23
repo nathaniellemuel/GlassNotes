@@ -727,7 +727,7 @@ export default function NotesListScreen() {
       <Modal visible={showFolderModal} transparent animationType="fade">
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <Pressable
@@ -765,7 +765,7 @@ export default function NotesListScreen() {
       <Modal visible={showPasswordModal} transparent animationType="fade">
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <Pressable
@@ -829,7 +829,7 @@ export default function NotesListScreen() {
       <Modal visible={showUnlockModal} transparent animationType="fade">
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <Pressable

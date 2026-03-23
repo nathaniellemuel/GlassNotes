@@ -134,6 +134,7 @@ export default function EditorScreen() {
   }, []);
 
   const contentRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const selectionRef = useRef(selection);
   const debouncedTitle = useDebounce(title, 500);
   const debouncedContent = useDebounce(content, 500);
@@ -294,6 +295,14 @@ export default function EditorScreen() {
     setChecklist((prev) => [...prev, { id: generateId(), text: '', checked: false }]);
   }, []);
 
+  const ensureFocusedInputVisible = useCallback(() => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 120);
+    });
+  }, []);
+
   const processImageResult = useCallback(async (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || result.assets.length === 0) return;
 
@@ -407,13 +416,15 @@ export default function EditorScreen() {
     setListType(type);
   }, []);
 
-  const handleAIUpdateNote = useCallback((text: string, action: 'append' | 'replace' | 'prepend') => {
+  const handleAIUpdateNote = useCallback((text: string, action: 'append' | 'replace' | 'prepend' | 'set-title') => {
     if (action === 'replace') {
       setContent(text);
     } else if (action === 'append') {
       setContent(prev => prev + '\n\n' + text);
     } else if (action === 'prepend') {
       setContent(prev => text + '\n\n' + prev);
+    } else if (action === 'set-title') {
+      setTitle(text);
     }
   }, []);
 
@@ -537,7 +548,7 @@ export default function EditorScreen() {
   const wordCount = strippedContent.trim().split(/\s+/).filter(Boolean).length;
   const charCount = strippedContent.length;
   const isKeyboardOpen = keyboardHeight > 0;
-  const toolbarBottomOffset = Platform.OS === 'android' && isKeyboardOpen ? keyboardHeight : 0;
+  const toolbarBottomOffset = 0;
   const toolbarHeightEstimate = 78 + (isKeyboardOpen ? 12 : Math.max(insets.bottom, 24));
   const scrollBottomPadding = toolbarHeightEstimate + (Platform.OS === 'android' && isKeyboardOpen ? 12 : 0);
   
@@ -628,11 +639,12 @@ export default function EditorScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, 12) : 0}
       >
         {/* Editor content */}
         <ScrollView
+          ref={scrollRef}
           style={styles.scrollView}
           contentContainerStyle={[
             styles.scrollContent,
@@ -652,6 +664,7 @@ export default function EditorScreen() {
               selectionColor={GlassTheme.accentPrimary}
               returnKeyType="next"
               onSubmitEditing={() => contentRef.current?.focus()}
+              onFocus={ensureFocusedInputVisible}
               blurOnSubmit={false}
             />
 
@@ -723,11 +736,16 @@ export default function EditorScreen() {
                 selection={selection}
                 multiline
                 textAlignVertical="top"
+                onFocus={ensureFocusedInputVisible}
                 scrollEnabled={false}
               />
             </View>
 
-            <ChecklistEditor items={checklist} onChange={setChecklist} />
+            <ChecklistEditor
+              items={checklist}
+              onChange={setChecklist}
+              onInputFocus={ensureFocusedInputVisible}
+            />
           </Animated.View>
         </ScrollView>
 
@@ -739,7 +757,7 @@ export default function EditorScreen() {
           right: 0,
           backgroundColor: GlassTheme.backgroundPrimary,
           borderTopWidth: 1,
-          borderTopColor: GlassTheme.border,
+          borderTopColor: GlassTheme.glassBorder,
           zIndex: 50,
           elevation: 10,
         }}>
