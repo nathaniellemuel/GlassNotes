@@ -12,6 +12,8 @@ import {
   ScrollView,
   useWindowDimensions,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -723,14 +725,19 @@ export default function NotesListScreen() {
       </AnimatedPressable>
 
       <Modal visible={showFolderModal} transparent animationType="fade">
-        <Pressable
-          style={[
-            styles.modalOverlay,
-            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
-          ]}
-          onPress={() => setShowFolderModal(false)}
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
-          <View style={[styles.modalSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
+          <Pressable
+            style={[
+              styles.modalOverlay,
+              { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+            ]}
+            onPress={() => setShowFolderModal(false)}
+          >
+            <View style={[styles.modalSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
             <Text style={styles.modalTitle}>{editingFolderId ? 'Rename Folder' : 'New Folder'}</Text>
             <TextInput
               style={styles.modalInput}
@@ -750,19 +757,25 @@ export default function NotesListScreen() {
                 <Text style={[styles.modalSaveText, { color: GlassTheme.accentText }]}>{editingFolderId ? 'Rename' : 'Create'}</Text>
               </Pressable>
             </View>
-          </View>
-        </Pressable>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={showPasswordModal} transparent animationType="fade">
-        <Pressable
-          style={[
-            styles.modalOverlay,
-            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
-          ]}
-          onPress={() => setShowPasswordModal(false)}
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
-          <View style={[styles.modalSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
+          <Pressable
+            style={[
+              styles.modalOverlay,
+              { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+            ]}
+            onPress={() => setShowPasswordModal(false)}
+          >
+            <View style={[styles.modalSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
             <Text style={styles.modalTitle}>Set Password</Text>
             <Text style={{ color: GlassTheme.textSecondary, marginBottom: 12, fontSize: 13 }}>
               Leave blank to remove password.
@@ -808,19 +821,25 @@ export default function NotesListScreen() {
                 <Text style={[styles.modalSaveText, { color: GlassTheme.accentText }]}>Save</Text>
               </Pressable>
             </View>
-          </View>
-        </Pressable>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={showUnlockModal} transparent animationType="fade">
-        <Pressable
-          style={[
-            styles.modalOverlay,
-            { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
-          ]}
-          onPress={() => setShowUnlockModal(false)}
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
-          <View style={[styles.modalSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
+          <Pressable
+            style={[
+              styles.modalOverlay,
+              { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+            ]}
+            onPress={() => setShowUnlockModal(false)}
+          >
+            <View style={[styles.modalSheet, { maxHeight: '82%' }]} onStartShouldSetResponder={() => true}>
             <Text style={styles.modalTitle}>Unlock Item</Text>
             <Text style={{ color: GlassTheme.textSecondary, marginBottom: 12, fontSize: 13 }}>
               This item is protected. Enter password to view contents.
@@ -844,8 +863,9 @@ export default function NotesListScreen() {
                 <Text style={[styles.modalSaveText, { color: GlassTheme.accentText }]}>Unlock</Text>
               </Pressable>
             </View>
-          </View>
-        </Pressable>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={showUploadSheet} transparent animationType="fade">

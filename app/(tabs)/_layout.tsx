@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import { View, Pressable, Text, StyleSheet } from 'react-native';
+import { View, Pressable, Text, StyleSheet, Keyboard, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -17,6 +18,25 @@ const TAB_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
 function GlassPillTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   useAppSettings();
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
+    const hideEvent = Platform.OS === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardVisible(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  if (isKeyboardVisible) {
+    return null;
+  }
+
   const activeColor = GlassTheme.accentPrimary;
   const tabActiveStyle = {
     backgroundColor: `${activeColor}26`,

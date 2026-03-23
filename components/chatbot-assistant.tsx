@@ -341,7 +341,8 @@ Just describe what you need. After I respond, you can apply changes directly to 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, 12) : 0}
     >
       {toast && (
         <GlassToast
@@ -365,6 +366,7 @@ Just describe what you need. After I respond, you can apply changes directly to 
       <ScrollView
         ref={scrollViewRef}
         style={styles.messagesContainer}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.messagesContent,

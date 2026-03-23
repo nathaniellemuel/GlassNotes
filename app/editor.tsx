@@ -537,6 +537,9 @@ export default function EditorScreen() {
   const wordCount = strippedContent.trim().split(/\s+/).filter(Boolean).length;
   const charCount = strippedContent.length;
   const isKeyboardOpen = keyboardHeight > 0;
+  const toolbarBottomOffset = Platform.OS === 'android' && isKeyboardOpen ? keyboardHeight : 0;
+  const toolbarHeightEstimate = 78 + (isKeyboardOpen ? 12 : Math.max(insets.bottom, 24));
+  const scrollBottomPadding = toolbarHeightEstimate + (Platform.OS === 'android' && isKeyboardOpen ? 12 : 0);
   
   // Extra space when keyboard is open to prevent sticking to prediction bars
   const extraPadding = Platform.OS === 'ios' && isKeyboardOpen ? 16 : 0;
@@ -625,15 +628,17 @@ export default function EditorScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, 12) : 0}
       >
         {/* Editor content */}
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: 120 + Math.max(insets.bottom, 24) }
+            { paddingBottom: scrollBottomPadding }
           ]}
+          keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
@@ -729,7 +734,7 @@ export default function EditorScreen() {
         {/* Fixed Toolbar */}
         <Animated.View style={{ 
           position: 'absolute',
-          bottom: 0,
+          bottom: toolbarBottomOffset,
           left: 0,
           right: 0,
           backgroundColor: GlassTheme.backgroundPrimary,

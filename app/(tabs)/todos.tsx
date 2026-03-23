@@ -310,12 +310,13 @@ export default function TodosScreen() {
       <Modal visible={showAIModal} animationType="slide" transparent presentationStyle="overFullScreen">
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <Pressable style={styles.modalBackdrop} onPress={() => !isProcessingAI && setShowAIModal(false)} />
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                 <MaterialIcons name="auto-awesome" size={24} color={GlassTheme.accentPrimary} />
                 <Text style={[styles.modalTitle, { marginBottom: 0 }]}>Smart To-Do (AI)</Text>
@@ -359,13 +360,14 @@ export default function TodosScreen() {
       <Modal visible={showModal} animationType="slide" transparent presentationStyle="overFullScreen">
         <KeyboardAvoidingView
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <Pressable style={styles.modalBackdrop} onPress={() => setShowModal(false)} />
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={styles.modalTitle}>
                 {editingTodo ? 'Edit Task' : 'New Task'}
               </Text>

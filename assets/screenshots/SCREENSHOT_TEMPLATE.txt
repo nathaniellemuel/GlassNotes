@@ -1,0 +1,14 @@
+Drop your screenshots in this folder with these names:
+
+- home.png
+- editor.png
+- todos.png
+- calendar.png
+- settings.png
+- ai-assistant.png
+
+Recommended size:
+- Portrait screenshots: 1080x2400 (or similar 9:20)
+- Keep all screenshots the same ratio for clean GitHub preview
+
+After adding screenshots, the README gallery will display them automatically.
