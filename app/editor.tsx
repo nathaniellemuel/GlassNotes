@@ -548,12 +548,7 @@ export default function EditorScreen() {
   const wordCount = strippedContent.trim().split(/\s+/).filter(Boolean).length;
   const charCount = strippedContent.length;
   const isKeyboardOpen = keyboardHeight > 0;
-  const toolbarBottomOffset = 0;
-  const toolbarHeightEstimate = 78 + (isKeyboardOpen ? 12 : Math.max(insets.bottom, 24));
-  const scrollBottomPadding = toolbarHeightEstimate + (Platform.OS === 'android' && isKeyboardOpen ? 12 : 0);
-  
-  // Extra space when keyboard is open to prevent sticking to prediction bars
-  const extraPadding = Platform.OS === 'ios' && isKeyboardOpen ? 16 : 0;
+  const scrollBottomPadding = GlassTheme.spacing.md;
   
   return (
     <View style={styles.screenContainer}>
@@ -639,7 +634,7 @@ export default function EditorScreen() {
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? Math.max(insets.top, 12) : 0}
       >
         {/* Editor content */}
@@ -749,24 +744,14 @@ export default function EditorScreen() {
           </Animated.View>
         </ScrollView>
 
-        {/* Fixed Toolbar */}
-        <Animated.View style={{ 
-          position: 'absolute',
-          bottom: toolbarBottomOffset,
-          left: 0,
-          right: 0,
-          backgroundColor: GlassTheme.backgroundPrimary,
-          borderTopWidth: 1,
-          borderTopColor: GlassTheme.glassBorder,
-          zIndex: 50,
-          elevation: 10,
-        }}>
+        {/* Toolbar - flex child, naturally sits above keyboard */}
+        <View style={[
+          styles.toolbarWrapper,
+          { paddingBottom: isKeyboardOpen ? 12 : Math.max(insets.bottom, 24) }
+        ]}>
           <View style={[
             styles.toolbarContainer,
-            { 
-              paddingBottom: isKeyboardOpen ? 12 : Math.max(insets.bottom, 24),
-              paddingTop: 12,
-            }
+            { paddingTop: 12 }
           ]}>
             {/* List Type Picker - popover above toolbar */}
             <ListTypePicker
@@ -796,7 +781,7 @@ export default function EditorScreen() {
               onAI={() => setShowAIEditor(true)}
             />
           </View>
-        </Animated.View>
+        </View>
       </KeyboardAvoidingView>
 
       {/* Modals */}
@@ -1065,10 +1050,13 @@ const styles = StyleSheet.create({
     paddingLeft: 0,
     paddingRight: 0,
   },
-  toolbarContainer: {
+  toolbarWrapper: {
     backgroundColor: GlassTheme.backgroundPrimary,
     borderTopWidth: 1,
     borderTopColor: GlassTheme.glassBorder,
+  },
+  toolbarContainer: {
+    backgroundColor: GlassTheme.backgroundPrimary,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
